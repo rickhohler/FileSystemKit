@@ -1,0 +1,25 @@
+# FileSystemKit Commit Message Template
+#
+# <type>(<scope>): <subject>
+#
+# <body>
+#
+# <footer>
+
+# Type: feat, fix, docs, style, refactor, test, chore
+# Scope: Optional - component or area affected
+# Subject: Brief description (50 chars or less)
+# Body: Detailed explanation (wrap at 72 chars)
+# Footer: Breaking changes, issue references
+
+# Example:
+# feat(adapters): Add support for new disk image format
+#
+# Added DiskImageAdapter implementation for XYZ format.
+# Includes format detection, reading, and metadata extraction.
+#
+# Closes #123
+
+# REMINDER: Update CHANGELOG.md before committing!
+# Then: git add CHANGELOG.md && git commit && git push
+
