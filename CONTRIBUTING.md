@@ -1,50 +1,70 @@
 # Contributing to FileSystemKit
 
-Thank you for your interest in contributing to FileSystemKit! This document provides guidelines and information for contributors.
+Thank you for your interest in FileSystemKit!
+
+## Contribution Policy
+
+**FileSystemKit is currently maintained internally and does not accept external code contributions or pull requests.**
+
+However, we greatly value and welcome your feedback in the following ways:
+
+### What We Welcome
+
+- **Bug Reports** - Help us identify and fix issues
+- **Feature Requests** - Share your ideas for improvements
+- **Documentation Feedback** - Report documentation issues or suggest improvements
+- **Questions** - Ask questions about usage or implementation
+- **Discussions** - Share your experiences and use cases
+
+### What We Don't Accept
+
+- **Pull Requests** - Code changes are managed internally
+- **Code Contributions** - Development is done by the maintainer team
+- **Direct Code Patches** - Please report issues instead
+
+## How to Contribute Feedback
+
+All feedback should be submitted via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues):
+
+1. **Bug Reports**: Use the [bug report template](https://github.com/rickhohler/FileSystemKit/issues/new?template=bug_report.md)
+2. **Feature Requests**: Use the [feature request template](https://github.com/rickhohler/FileSystemKit/issues/new?template=feature_request.md)
+3. **Questions**: Use the [question template](https://github.com/rickhohler/FileSystemKit/issues/new?template=question.md)
 
 ## Code of Conduct
 
-This project adheres to a Code of Conduct that all contributors are expected to follow. Please be respectful and constructive in all interactions.
+This project adheres to a Code of Conduct. Please be respectful and constructive in all interactions.
 
-## Getting Started
+## For Maintainers
 
-1. Fork the repository
-2. Clone your fork: `git clone https://github.com/YOUR_USERNAME/FileSystemKit.git`
-3. Create a branch: `git checkout -b feature/your-feature-name`
-4. Make your changes
-5. Run tests: `swift test`
-6. Ensure code builds: `swift build`
-7. Commit your changes: `git commit -m "Add feature: description"`
-8. Push to your fork: `git push origin feature/your-feature-name`
-9. Create a Pull Request
+The following sections are for internal maintainers only.
 
-## Development Setup
+### Development Setup
 
-### Requirements
+#### Requirements
 
 - Swift 6.0+
 - Xcode 15.0+ (for macOS development)
 - macOS 12.0+ (for building)
 
-### Building
+#### Building
 
 ```bash
 swift build
 ```
 
-### Running Tests
+#### Running Tests
 
 ```bash
 swift test
 ```
 
-### Running Tests with Coverage
+#### Running Tests with Coverage
 
 ```bash
 swift test --enable-code-coverage
 ```
 
-## Code Style
+### Code Style
 
 - Follow Swift API Design Guidelines
 - Use meaningful variable and function names
@@ -53,7 +73,7 @@ swift test --enable-code-coverage
 - Use `async/await` for asynchronous operations
 - Prefer value types (structs) over reference types (classes) when possible
 
-## Testing Guidelines
+### Testing Guidelines
 
 - Write unit tests for all new functionality
 - Aim for at least 80% code coverage
@@ -61,31 +81,23 @@ swift test --enable-code-coverage
 - Use mock implementations (`MockChunkStorage`, `MockMetadataStorage`) for testing
 - Test both success and error cases
 
-## Pull Request Process
+### Adding New Features
 
-1. Ensure all tests pass
-2. Update CHANGELOG.md with your changes
-3. Update documentation if needed
-4. Ensure code coverage doesn't decrease
-5. Request review from maintainers
-
-## Adding New Features
-
-### Adding a New Compression Adapter
+#### Adding a New Compression Adapter
 
 1. Create a new file in `Sources/FileSystemKit/Compression/`
 2. Implement the `CompressionAdapter` protocol
 3. Register the adapter in `CompressionAdapterRegistry`
 4. Add tests in `Tests/FileSystemKitTests/CompressionAdapterTests.swift`
 
-### Adding a New Disk Image Adapter
+#### Adding a New Disk Image Adapter
 
 1. Create a new file in `Sources/FileSystemKit/Adapters/`
 2. Implement the `DiskImageAdapter` protocol
 3. Register the adapter in `DiskImageAdapterRegistry`
 4. Add tests
 
-### Adding a New File System Strategy
+#### Adding a New File System Strategy
 
 1. Create a new file in `Sources/FileSystemKit/FileSystems/`
 2. Implement the `FileSystemStrategy` protocol
@@ -122,23 +134,12 @@ When reporting issues, please include:
 3. Use the appropriate issue template
 4. Provide as much detail as possible
 
-## Code Review Process
-
-1. All pull requests require at least one review from maintainers
-2. Maintainers will review code for:
-   - Correctness and functionality
-   - Code style and consistency
-   - Test coverage
-   - Documentation completeness
-3. Address review feedback promptly
-4. Once approved, maintainers will merge the PR
-
 ## Release Process
 
-Releases are managed by maintainers. When your PR is merged:
-- It will be included in the next release
+Releases are managed internally by maintainers:
 - Releases follow semantic versioning
 - Release notes are generated from CHANGELOG.md
+- New features and bug fixes are included based on issue tracking and internal development priorities
 
 ## Questions?
 

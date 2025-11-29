@@ -259,18 +259,16 @@ if let format = FileSystemStrategyFactory.detectFormat(in: diskData) {
 
 ## Contributing
 
-Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+**Note**: FileSystemKit is currently maintained internally and does not accept external code contributions or pull requests. However, we welcome and appreciate:
 
-We welcome contributions of all kinds:
 - **Bug reports** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
 - **Feature requests** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
-- **Code contributions** - Submit via Pull Requests
-- **Documentation improvements** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues) or Pull Requests
-- **Test cases** - Include with code contributions
+- **Documentation feedback** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
+- **Questions and discussions** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
 
 **All issues are tracked in GitHub Issues** - please use the [issue templates](https://github.com/rickhohler/FileSystemKit/issues/new/choose) when reporting bugs or requesting features.
 
-Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+While we don't accept pull requests, your feedback and bug reports are valuable and help improve FileSystemKit. Thank you for your interest and support!
 
 ## Security
 
@@ -286,7 +284,7 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Acknowledgments
 
-FileSystemKit was created to provide a modern, extensible foundation for file system operations in Swift. Special thanks to all contributors and the open-source community.
+FileSystemKit was created to provide a modern, extensible foundation for file system operations in Swift. Thank you to the open-source community for your feedback and support.
 
 ## Support
 
