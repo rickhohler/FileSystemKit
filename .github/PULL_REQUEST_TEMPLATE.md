@@ -1,3 +1,16 @@
+## ⚠️ Important Notice
+
+**FileSystemKit does not accept external code contributions or pull requests.**
+
+This repository is maintained internally. If you have:
+- **Bug reports**: Please open an [issue](https://github.com/rickhohler/FileSystemKit/issues/new?template=bug_report.md)
+- **Feature requests**: Please open an [issue](https://github.com/rickhohler/FileSystemKit/issues/new?template=feature_request.md)
+- **Questions**: Please open an [issue](https://github.com/rickhohler/FileSystemKit/issues/new?template=question.md)
+
+Thank you for your interest in FileSystemKit! Your feedback is valuable and helps improve the project.
+
+---
+
 ## Description
 <!-- Provide a brief description of your changes -->
 
