@@ -263,11 +263,13 @@ if let format = FileSystemStrategyFactory.detectFormat(in: diskData) {
 Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
 
 We welcome contributions of all kinds:
-- Bug reports
-- Feature requests
-- Code contributions
-- Documentation improvements
-- Test cases
+- **Bug reports** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
+- **Feature requests** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
+- **Code contributions** - Submit via Pull Requests
+- **Documentation improvements** - Tracked via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues) or Pull Requests
+- **Test cases** - Include with code contributions
+
+**All issues are tracked in GitHub Issues** - please use the [issue templates](https://github.com/rickhohler/FileSystemKit/issues/new/choose) when reporting bugs or requesting features.
 
 Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
 
@@ -290,7 +292,20 @@ FileSystemKit was created to provide a modern, extensible foundation for file sy
 
 ## Support
 
-- **Issues**: [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
-- **Discussions**: [GitHub Discussions](https://github.com/rickhohler/FileSystemKit/discussions)
-- **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
+**All issues are tracked using GitHub Issues.** This is the primary system for:
+- Bug reports
+- Feature requests
+- Questions and discussions
+- Documentation improvements
+
+- **Issues**: [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues) - Primary issue tracking system
+- **Discussions**: [GitHub Discussions](https://github.com/rickhohler/FileSystemKit/discussions) - For general community discussions
+- **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting (use GitHub Security Advisories, not public issues)
+
+### Reporting Issues
+
+Before reporting an issue:
+1. Search [existing issues](https://github.com/rickhohler/FileSystemKit/issues) to see if it's already reported
+2. Use the appropriate [issue template](https://github.com/rickhohler/FileSystemKit/issues/new/choose)
+3. Provide detailed information including Swift version, platform, and reproduction steps
 

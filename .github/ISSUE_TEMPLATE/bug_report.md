@@ -4,7 +4,10 @@ about: Create a report to help us improve
 title: '[BUG] '
 labels: bug
 assignees: ''
+
 ---
+
+**All issues are tracked in GitHub Issues.** Please search existing issues before creating a new one.
 
 ## Description
 A clear and concise description of what the bug is.

@@ -4,7 +4,10 @@ about: Suggest an idea for this project
 title: '[FEATURE] '
 labels: enhancement
 assignees: ''
+
 ---
+
+**All issues are tracked in GitHub Issues.** Please search existing issues before creating a new one.
 
 ## Feature Description
 A clear and concise description of the feature you'd like to see.

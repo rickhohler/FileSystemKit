@@ -92,7 +92,20 @@ swift test --enable-code-coverage
 3. Register the strategy in `FileSystemStrategyFactory`
 4. Add tests
 
-## Reporting Issues
+## Issue Tracking
+
+**All issues are tracked using GitHub Issues.** This includes:
+- Bug reports
+- Feature requests
+- Questions and discussions
+- Documentation improvements
+- Performance issues
+
+### Reporting Issues
+
+All issues should be reported via [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues). Please use the appropriate issue template:
+- **Bug Report**: Use the bug report template for bugs and unexpected behavior
+- **Feature Request**: Use the feature request template for new features or enhancements
 
 When reporting issues, please include:
 
@@ -102,6 +115,12 @@ When reporting issues, please include:
 - Expected behavior
 - Actual behavior
 - Relevant code snippets or error messages
+
+**Before creating a new issue**, please:
+1. Search existing issues to see if your issue has already been reported
+2. Check if your issue has been resolved in a recent release
+3. Use the appropriate issue template
+4. Provide as much detail as possible
 
 ## Code Review Process
 
@@ -123,8 +142,10 @@ Releases are managed by maintainers. When your PR is merged:
 
 ## Questions?
 
-Feel free to:
-- Open an issue for questions or discussions
-- Start a discussion in GitHub Discussions
-- Check existing issues and discussions first
+All questions and discussions should be tracked via **GitHub Issues**:
+- Open a new issue with the "question" label for questions
+- Search existing issues first to see if your question has been answered
+- For general discussions, you can also use GitHub Discussions
+
+**Note**: All project-related issues, bugs, features, and questions are tracked in [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues).
 
