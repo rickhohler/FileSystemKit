@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- **GitHub Actions**: Improved test binary discovery in CI workflow
+  - Enhanced coverage data finding logic with multiple fallback patterns
+  - Added better error handling and debugging output
+  - Fixed test binary path resolution for different build configurations
+
 ### Added
 - Future enhancements and features
 

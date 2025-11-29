@@ -35,24 +35,53 @@ jobs:
       - name: Run tests with coverage
         run: |
           swift test --enable-code-coverage
+          # List build artifacts for debugging
+          echo "Build artifacts:"
+          find .build -name "*.xctest" -type d 2>/dev/null || true
+          find .build -name "default.profdata" -type f 2>/dev/null || true
       
       - name: Find coverage data
         id: coverage
         run: |
+          # Find profdata file
           PROF_DATA=$(find .build -name "default.profdata" -type f | head -1)
-          # Find the test executable binary inside the .xctest bundle
-          XCTEST_BUNDLE=$(find .build -name "FileSystemKitPackageTests.xctest" -type d | head -1)
+          
+          # Find test binary - try multiple patterns
+          BINARY=""
+          XCTEST_BUNDLE=$(find .build -name "*PackageTests.xctest" -type d | head -1)
+          
           if [ -n "$XCTEST_BUNDLE" ]; then
-            BINARY="$XCTEST_BUNDLE/Contents/MacOS/FileSystemKitPackageTests"
-          else
-            # Fallback: try to find the binary directly
-            BINARY=$(find .build -name "FileSystemKitPackageTests" -type f -path "*/Contents/MacOS/*" | head -1)
+            # Try standard path
+            TEST_NAME=$(basename "$XCTEST_BUNDLE" .xctest)
+            BINARY="$XCTEST_BUNDLE/Contents/MacOS/$TEST_NAME"
+            
+            # Verify binary exists
+            if [ ! -f "$BINARY" ]; then
+              # Try alternative: find binary directly
+              BINARY=$(find "$XCTEST_BUNDLE" -type f -perm +111 | head -1)
+            fi
           fi
+          
+          # Fallback: find any test binary
+          if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
+            BINARY=$(find .build -name "*Tests" -type f -perm +111 -path "*/Contents/MacOS/*" | head -1)
+          fi
+          
           echo "profdata=$PROF_DATA" >> $GITHUB_OUTPUT
           echo "binary=$BINARY" >> $GITHUB_OUTPUT
           echo "Found profdata: $PROF_DATA"
           echo "Found binary: $BINARY"
           echo "XCTest bundle: $XCTEST_BUNDLE"
+          
+          # Verify files exist
+          if [ -z "$PROF_DATA" ] || [ ! -f "$PROF_DATA" ]; then
+            echo "Warning: profdata not found"
+          fi
+          if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
+            echo "Warning: test binary not found"
+            echo "Searching for test binaries..."
+            find .build -name "*Tests*" -type f 2>/dev/null | head -10
+          fi
       
       - name: Generate code coverage report
         if: steps.coverage.outputs.profdata != '' && steps.coverage.outputs.binary != ''
