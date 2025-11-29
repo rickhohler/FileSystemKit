@@ -11,7 +11,7 @@ import Foundation
 
 /// Registry for mapping file extensions to types/identifiers.
 /// Provides a general-purpose extension registration system that can be used
-/// by FileSystemKit, RetroboxFS, and other projects.
+/// by FileSystemKit and packages that extend it.
 ///
 /// ## Usage Example
 /// ```swift

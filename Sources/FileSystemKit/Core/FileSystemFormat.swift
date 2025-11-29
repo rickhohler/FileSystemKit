@@ -7,7 +7,7 @@ import Foundation
 
 /// File system format enumeration
 /// Represents the original file system layout (not the modern image format)
-/// Includes both modern formats (FileSystemKit) and vintage formats (RetroboxFS)
+/// Includes both modern formats (FileSystemKit) and vintage formats (for compatibility)
 public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
     // Modern file systems (post-2000, still in use) - FileSystemKit
     case iso9660 = "iso9660"      // ISO 9660 CD-ROM/DVD-ROM
@@ -15,7 +15,7 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
     case ntfs = "ntfs"            // NTFS file system (future)
     case exfat = "exfat"          // exFAT file system (future)
     
-    // Vintage file systems (pre-2000, obsolete) - RetroboxFS
+    // Vintage file systems (pre-2000, obsolete) - For compatibility with extended packages
     // Apple II
     case apple2DOS33 = "apple2-dos33"
     case apple2ProDOS = "apple2-prodos"

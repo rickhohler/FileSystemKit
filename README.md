@@ -5,7 +5,7 @@
 [![Codecov](https://codecov.io/gh/rickhohler/FileSystemKit/branch/main/graph/badge.svg)](https://codecov.io/gh/rickhohler/FileSystemKit)
 [![GitHub Actions](https://github.com/rickhohler/FileSystemKit/workflows/Unit%20Tests/badge.svg)](https://github.com/rickhohler/FileSystemKit/actions/workflows/tests.yml)
 
-A Swift package providing modern file system and disk image format support. FileSystemKit serves as the foundation for file system operations, handling modern formats (post-2000) and providing core types that can be extended by other packages like RetroboxFS for vintage file systems.
+A Swift package providing modern file system and disk image format support. FileSystemKit serves as the foundation for file system operations, handling modern formats (post-2000) and providing core types that can be extended by other packages for specialized file system support.
 
 ## Features
 
@@ -146,17 +146,16 @@ if let type = await registry.type(forExtension: "dmg") {
 }
 ```
 
-## Relationship to RetroboxFS
+## Extensibility
 
-FileSystemKit provides the foundation for modern file system operations. RetroboxFS extends FileSystemKit to support vintage file systems (pre-2000) such as:
+FileSystemKit is designed to be extended by other packages for specialized file system support. The core types, protocols, and architecture are all extensible:
 
-- Apple II (DOS 3.3, ProDOS)
-- Commodore 64 (1541, 1581)
-- Atari 8-bit
-- MS-DOS/PC-DOS (FAT12/16)
-- And more vintage formats
+- **Core Types**: `RawDiskData`, `DiskGeometry`, `FileSystemComponent` can be extended
+- **Protocols**: `DiskImageAdapter`, `FileSystemStrategy`, `CompressionAdapter` can be implemented by other packages
+- **Registries**: All registries support registration of custom adapters and strategies
+- **Pipeline Architecture**: The pipeline system can be extended with custom stages
 
-RetroboxFS depends on FileSystemKit and uses its core types, compression adapters, and pipeline architecture.
+Other packages can depend on FileSystemKit and extend its functionality for specialized use cases.
 
 ## Design Principles
 
@@ -283,7 +282,6 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Related Projects
 
-- [RetroboxFS](https://github.com/rickhohler/RetroboxFS) - Vintage file system support built on FileSystemKit
 - [InventoryKit](https://github.com/rickhohler/InventoryKit) - Digital asset inventory management
 
 ## Acknowledgments

@@ -6,7 +6,7 @@
 // The DiskImageAdapter extracts raw disk data from various modern image formats
 // (e.g., .dmg, .iso, .vhd, .img) and converts them to RawDiskData.
 //
-// Note: Vintage formats (pre-2000) are handled by RetroboxFS
+// Note: Vintage formats (pre-2000) can be handled by packages that extend FileSystemKit
 
 import Foundation
 

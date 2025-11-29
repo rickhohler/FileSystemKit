@@ -4,7 +4,7 @@
 // Raw sector dumps contain raw sector data with no special format structure.
 //
 // This is a generic adapter that can handle raw disk images of various geometries.
-// Vintage-specific raw adapters (e.g., Apple II) are handled by RetroboxFS.
+// Vintage-specific raw adapters can be implemented by packages that extend FileSystemKit.
 
 import Foundation
 

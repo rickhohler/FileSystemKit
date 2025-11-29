@@ -12,7 +12,7 @@
 // - File content is loaded on-demand via readFile() method
 // - This enables fast parsing of thousands of files
 //
-// Note: Vintage file systems (pre-2000) are handled by RetroboxFS
+// Note: Vintage file systems (pre-2000) can be handled by packages that extend FileSystemKit
 
 import Foundation
 

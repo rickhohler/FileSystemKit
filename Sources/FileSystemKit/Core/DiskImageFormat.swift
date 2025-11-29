@@ -7,7 +7,7 @@ import Foundation
 
 /// Disk image format enumeration
 /// Represents how disk images are stored in files
-/// Includes both modern formats (FileSystemKit) and vintage formats (RetroboxFS)
+/// Includes both modern formats (FileSystemKit) and vintage formats (for compatibility)
 public enum DiskImageFormat: String, Codable, CaseIterable, Sendable {
     // Modern formats (post-2000, still in use) - FileSystemKit
     case raw = "raw"              // Raw sector dumps (generic)
@@ -16,7 +16,7 @@ public enum DiskImageFormat: String, Codable, CaseIterable, Sendable {
     case vhd = "vhd"               // Virtual Hard Disk format
     case img = "img"               // Raw disk images (for modern FAT32/NTFS)
     
-    // Vintage formats (pre-2000, obsolete) - RetroboxFS
+    // Vintage formats (pre-2000, obsolete) - For compatibility with extended packages
     // Apple II formats
     case a2r = "a2r"               // A2R flux-level format
     case woz = "woz"               // WOZ format with copy protection
