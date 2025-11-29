@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# FileSystemKit Commit Message Hook
+# Reminds to update CHANGELOG and push
+#
+# To install: cp scripts/hooks/commit-msg .git/hooks/commit-msg && chmod +x .git/hooks/commit-msg
+
+COMMIT_MSG_FILE=$1
+COMMIT_MSG=$(cat "$COMMIT_MSG_FILE")
+
+# Check if commit message mentions changelog
+if echo "$COMMIT_MSG" | grep -qi "changelog\|update.*changelog"; then
+    echo "✓ Commit message mentions CHANGELOG"
+else
+    echo "💡 REMINDER: Don't forget to update CHANGELOG.md if this is a user-facing change!"
+fi
+
+# Check if commit message mentions push
+if echo "$COMMIT_MSG" | grep -qi "push\|git push"; then
+    echo "✓ Commit message mentions push"
+else
+    echo "💡 REMINDER: After committing, run: git push origin main"
+fi
+
+exit 0
+
