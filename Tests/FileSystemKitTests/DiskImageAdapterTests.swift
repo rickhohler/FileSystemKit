@@ -350,5 +350,203 @@ final class DiskImageAdapterTests: XCTestCase {
             // May be nil for incomplete ISO, which is OK
         }
     }
+    
+    // MARK: - Corrupt File Error Handling Tests
+    
+    func testCorruptDMGEmptyFile() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-empty-dmg")
+        
+        if let corruptFile = getTestResource("Corrupt/empty.dmg") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            do {
+                _ = try await DMGImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for empty DMG file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptDMGTooSmall() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-too-small-dmg")
+        
+        if let corruptFile = getTestResource("Corrupt/too_small.dmg") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check
+            XCTAssertFalse(DMGImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await DMGImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for too small DMG file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptDMGInvalidHeader() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-invalid-header-dmg")
+        
+        if let corruptFile = getTestResource("Corrupt/invalid_header.dmg") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (wrong signature)
+            XCTAssertFalse(DMGImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await DMGImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for invalid header DMG file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptISO9660EmptyFile() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-empty-iso")
+        
+        if let corruptFile = getTestResource("Corrupt/empty.iso") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check
+            XCTAssertFalse(ISO9660ImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await ISO9660ImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for empty ISO file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptISO9660TooSmall() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-too-small-iso")
+        
+        if let corruptFile = getTestResource("Corrupt/too_small.iso") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (not enough data for sector 16)
+            XCTAssertFalse(ISO9660ImageAdapter.canRead(data: corruptData))
+        }
+    }
+    
+    func testCorruptISO9660InvalidHeader() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-invalid-header-iso")
+        
+        if let corruptFile = getTestResource("Corrupt/invalid_header.iso") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (wrong signature)
+            XCTAssertFalse(ISO9660ImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await ISO9660ImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for invalid header ISO file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptVHDEmptyFile() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-empty-vhd")
+        
+        if let corruptFile = getTestResource("Corrupt/empty.vhd") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check
+            XCTAssertFalse(VHDImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await VHDImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for empty VHD file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptVHDTooSmall() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-too-small-vhd")
+        
+        if let corruptFile = getTestResource("Corrupt/too_small.vhd") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (not enough data for footer)
+            XCTAssertFalse(VHDImageAdapter.canRead(data: corruptData))
+        }
+    }
+    
+    func testCorruptVHDInvalidHeader() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-invalid-header-vhd")
+        
+        if let corruptFile = getTestResource("Corrupt/invalid_header.vhd") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (wrong signature)
+            XCTAssertFalse(VHDImageAdapter.canRead(data: corruptData))
+            
+            do {
+                _ = try await VHDImageAdapter.read(chunkStorage: mockStorage, identifier: identifier)
+                XCTFail("Should throw error for invalid header VHD file")
+            } catch {
+                // Expected to throw error
+                XCTAssertTrue(error is DiskImageError || error is FileSystemError)
+            }
+        }
+    }
+    
+    func testCorruptIMGEmptyFile() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-empty-img")
+        
+        if let corruptFile = getTestResource("Corrupt/empty.img") {
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (too small - needs 360KB minimum)
+            XCTAssertFalse(IMGImageAdapter.canRead(data: corruptData))
+        }
+    }
+    
+    func testCorruptIMGTooSmall() async throws {
+        let mockStorage = MockChunkStorage()
+        let identifier = ChunkIdentifier(id: "corrupt-too-small-img")
+        
+        if let corruptFile = getTestResource("Corrupt/too_small.vhd") { // Reuse too_small file
+            let corruptData = try Data(contentsOf: corruptFile)
+            _ = try await mockStorage.writeChunk(corruptData, identifier: identifier, metadata: nil)
+            
+            // Should fail canRead check (too small - needs 360KB minimum)
+            XCTAssertFalse(IMGImageAdapter.canRead(data: corruptData))
+        }
+    }
 }
 

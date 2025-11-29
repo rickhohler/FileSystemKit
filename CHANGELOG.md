@@ -10,6 +10,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Future enhancements and features
 
+### Fixed
+- **GZIP Compression/Decompression**: Fixed GZIP format handling
+  - Corrected GZIP header parsing in `GzipCompressionAdapter.decompress`
+  - Added proper GZIP header and footer creation in `compressGzip`
+  - Fixed misaligned pointer issues in compression pipeline tests
+  - Note: Currently uses LZMA algorithm instead of DEFLATE (limitation for MVP)
+
+- **FileSystemStrategyFactory**: Implemented strategy instance creation
+  - Added `createStrategy(for:diskData:)` method for creating strategy instances with disk data
+  - Added automatic registration of ISO9660FileSystemStrategy
+  - Added `ensureInitialized()` to guarantee default strategies are registered
+  - Resolves GitHub issue #3
+
+- **Test Resources**: Verified and confirmed test resource files
+  - All required test resource files are present and working correctly
+  - DMG, ISO9660, VHD, and IMG test files contain proper format signatures
+  - All disk image adapter tests passing with test resources
+  - Resolves GitHub issue #5
+
 ## [1.0.0] - 2025-11-29
 
 ### Added

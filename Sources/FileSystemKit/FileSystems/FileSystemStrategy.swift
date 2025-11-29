@@ -193,9 +193,23 @@ public class FileSystemStrategyFactory {
     /// Note: This is typically initialized at startup, so concurrency safety is managed by initialization order
     nonisolated(unsafe) private static var registeredStrategies: [FileSystemFormat: FileSystemStrategy.Type] = [:]
     
+    /// Initialize default strategies
+    private static func initializeDefaults() {
+        // Register ISO9660 strategy
+        register(ISO9660FileSystemStrategy.self)
+    }
+    
+    /// Ensure defaults are initialized (called on first access)
+    private static func ensureInitialized() {
+        if registeredStrategies.isEmpty {
+            initializeDefaults()
+        }
+    }
+    
     /// Register a file system strategy
     /// - Parameter strategyType: Strategy type to register
     public static func register<T: FileSystemStrategy>(_ strategyType: T.Type) {
+        ensureInitialized()
         registeredStrategies[T.format] = strategyType
     }
     
@@ -209,6 +223,7 @@ public class FileSystemStrategyFactory {
     /// - Parameter diskData: Raw disk data to analyze
     /// - Returns: Detected file system format, or nil if unknown
     public static func detectFormat(in diskData: RawDiskData) -> FileSystemFormat? {
+        ensureInitialized()
         // Try each registered strategy
         for strategyType in registeredStrategies.values {
             if let format = strategyType.detectFormat(in: diskData) {
@@ -221,16 +236,41 @@ public class FileSystemStrategyFactory {
     /// Create a strategy instance for the given format
     /// - Parameter format: File system format
     /// - Returns: Strategy instance, or nil if not registered
+    /// - Note: This creates a "detection-only" instance. For parsing, use `createStrategy(for:diskData:)` instead.
     public static func createStrategy(for format: FileSystemFormat) -> FileSystemStrategy? {
+        ensureInitialized()
+        guard let strategyType = registeredStrategies[format] else {
+            return nil
+        }
+        
+        // For strategies that require diskData for initialization, we can't create an instance here
+        // Instead, return nil and require callers to use createStrategy(for:diskData:) for parsing
+        // This method is primarily for checking if a strategy is available
+        return nil
+    }
+    
+    /// Create a strategy instance for the given format with disk data
+    /// - Parameters:
+    ///   - format: File system format
+    ///   - diskData: Raw disk data to parse
+    /// - Returns: Strategy instance, or nil if not registered or initialization fails
+    public static func createStrategy(for format: FileSystemFormat, diskData: RawDiskData) throws -> FileSystemStrategy? {
+        ensureInitialized()
         guard registeredStrategies[format] != nil else {
             return nil
         }
         
-        // Create instance (strategies should be value types or have init())
-        // For now, we'll require strategies to be structs or classes with init()
-        // This will be implemented by concrete strategies
-        // TODO: Implement instance creation when concrete strategies are added
-        return nil
+        // Try to create instance using the strategy's initializer
+        // Strategies should implement init(diskData: RawDiskData) throws
+        // We'll use a type-erased approach to call the initializer
+        
+        switch format {
+        case .iso9660:
+            return try ISO9660FileSystemStrategy(diskData: diskData)
+        default:
+            // For other formats, return nil (not yet implemented)
+            return nil
+        }
     }
     
     /// Get strategy type for the given format

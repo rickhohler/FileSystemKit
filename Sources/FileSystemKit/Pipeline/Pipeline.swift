@@ -21,7 +21,8 @@ import Foundation
 @preconcurrency
 public struct PipelineContext: @unchecked Sendable {
     /// The input file URL being processed
-    public let inputURL: URL
+    /// Note: This can be updated during pipeline processing (e.g., after decompression)
+    public var inputURL: URL
     
     /// Detected disk image format
     public var diskImageFormat: DiskImageFormat?

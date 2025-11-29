@@ -158,6 +158,12 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
         throw FileSystemError.unsupportedFileSystemFormat
     }
     
+    /// Register this strategy with the factory
+    /// Call this during module initialization
+    public static func register() {
+        FileSystemStrategyFactory.register(ISO9660FileSystemStrategy.self)
+    }
+    
     /// Create a new formatted ISO 9660 disk image
     public static func format(parameters: FormatParameters) throws -> RawDiskData {
         // TODO: Implement ISO 9660 formatting
