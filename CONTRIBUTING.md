@@ -103,7 +103,28 @@ When reporting issues, please include:
 - Actual behavior
 - Relevant code snippets or error messages
 
+## Code Review Process
+
+1. All pull requests require at least one review from maintainers
+2. Maintainers will review code for:
+   - Correctness and functionality
+   - Code style and consistency
+   - Test coverage
+   - Documentation completeness
+3. Address review feedback promptly
+4. Once approved, maintainers will merge the PR
+
+## Release Process
+
+Releases are managed by maintainers. When your PR is merged:
+- It will be included in the next release
+- Releases follow semantic versioning
+- Release notes are generated from CHANGELOG.md
+
 ## Questions?
 
-Feel free to open an issue for questions or discussions about the project.
+Feel free to:
+- Open an issue for questions or discussions
+- Start a discussion in GitHub Discussions
+- Check existing issues and discussions first
 

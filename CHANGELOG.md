@@ -13,6 +13,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-11-28
 
 ### Added
+- **Public Project Setup**: Complete documentation and templates for public release
+  - Security policy (SECURITY.md)
+  - GitHub issue templates (bug reports, feature requests)
+  - Pull request template
+  - Enhanced README with quick start and examples
+  - Improved contributing guidelines
+
+### Added
 - **Initial Release**: Foundation library for modern file system operations
 - **Core Types**: `RawDiskData`, `DiskGeometry`, `SectorData`, `TrackData`, `FluxData`
 - **Storage Protocols**: `ChunkStorage` and `MetadataStorage` abstractions

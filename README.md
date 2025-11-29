@@ -171,16 +171,126 @@ RetroboxFS depends on FileSystemKit and uses its core types, compression adapter
 - Swift 6.0+
 - macOS 12.0+ / iOS 15.0+ / tvOS 15.0+ / watchOS 8.0+
 
+## Quick Start
+
+```swift
+import FileSystemKit
+
+// Initialize FileSystemKit
+// Compression adapters and disk image adapters are automatically registered
+
+// Read a disk image
+let url = URL(fileURLWithPath: "/path/to/image.dmg")
+let adapter = DiskImageAdapterRegistry.shared.findAdapter(forExtension: "dmg")
+if let adapter = adapter {
+    let chunkStorage = FileSystemChunkStorage(baseURL: tempDirectory)
+    let identifier = ChunkIdentifier(id: UUID().uuidString)
+    let diskData = try await adapter.read(chunkStorage: chunkStorage, identifier: identifier)
+    
+    // Work with disk data
+    print("Disk size: \(diskData.totalSize) bytes")
+}
+```
+
+## Examples
+
+### Reading a Compressed Disk Image
+
+```swift
+import FileSystemKit
+
+let compressedURL = URL(fileURLWithPath: "/path/to/image.dmg.gz")
+
+// Automatically detect and decompress
+let registry = CompressionAdapterRegistry.shared
+if let adapter = registry.findAdapter(for: compressedURL) {
+    let decompressedURL = try adapter.decompress(url: compressedURL)
+    // Process decompressed image
+}
+```
+
+### Processing Files in a Disk Image
+
+```swift
+import FileSystemKit
+
+// Create a file listing pipeline
+let pipeline = PipelineFactory.createFileListingPipeline()
+let context = PipelineContext(
+    diskImageURL: diskImageURL,
+    chunkStorage: chunkStorage,
+    metadataStorage: metadataStorage
+)
+
+let result = try await pipeline.execute(context: context)
+if case .fileListing(let listing) = result {
+    for file in listing.files {
+        print("\(file.path): \(file.size) bytes")
+    }
+}
+```
+
+### Working with File Systems
+
+```swift
+import FileSystemKit
+
+// Detect file system format
+let diskData: RawDiskData = // ... obtain disk data
+if let format = FileSystemStrategyFactory.detectFormat(in: diskData) {
+    print("Detected format: \(format)")
+    
+    // Create strategy and parse file system
+    if let strategy = FileSystemStrategyFactory.createStrategy(for: format) {
+        let rootFolder = try await strategy.parse(diskData: diskData)
+        // Navigate file system
+        for file in rootFolder.getFiles() {
+            print("File: \(file.name)")
+        }
+    }
+}
+```
+
+## Documentation
+
+- [API Documentation](https://github.com/rickhohler/FileSystemKit/wiki) - Detailed API reference (coming soon)
+- [Architecture Guide](https://github.com/rickhohler/FileSystemKit/wiki/Architecture) - Understanding FileSystemKit's architecture
+- [Contributing Guide](CONTRIBUTING.md) - How to contribute to FileSystemKit
+- [Code of Conduct](CODE_OF_CONDUCT.md) - Community guidelines
+
 ## Contributing
 
-Contributions are welcome! Please see our contributing guidelines for details.
+Contributions are welcome! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
+
+We welcome contributions of all kinds:
+- Bug reports
+- Feature requests
+- Code contributions
+- Documentation improvements
+- Test cases
+
+Please read our [Code of Conduct](CODE_OF_CONDUCT.md) before contributing.
+
+## Security
+
+For security vulnerabilities, please see our [Security Policy](SECURITY.md).
 
 ## License
 
-MIT License - see LICENSE file for details.
+MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Related Projects
 
 - [RetroboxFS](https://github.com/rickhohler/RetroboxFS) - Vintage file system support built on FileSystemKit
 - [InventoryKit](https://github.com/rickhohler/InventoryKit) - Digital asset inventory management
+
+## Acknowledgments
+
+FileSystemKit was created to provide a modern, extensible foundation for file system operations in Swift. Special thanks to all contributors and the open-source community.
+
+## Support
+
+- **Issues**: [GitHub Issues](https://github.com/rickhohler/FileSystemKit/issues)
+- **Discussions**: [GitHub Discussions](https://github.com/rickhohler/FileSystemKit/discussions)
+- **Security**: See [SECURITY.md](SECURITY.md) for vulnerability reporting
 
