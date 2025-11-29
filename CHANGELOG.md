@@ -8,10 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
-- **GitHub Actions**: Improved test binary discovery in CI workflow
-  - Enhanced coverage data finding logic with multiple fallback patterns
-  - Added better error handling and debugging output
-  - Fixed test binary path resolution for different build configurations
+- **GitHub Actions**: Fixed CI workflow issues
+  - Changed Swift tools version from 6.2 to 6.0 to match CI environment
+  - Improved test binary discovery with multiple fallback patterns
+  - Enhanced coverage data finding logic with better error handling
+  - Added debugging output for troubleshooting
 
 ### Added
 - Future enhancements and features
