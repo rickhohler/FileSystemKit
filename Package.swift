@@ -43,7 +43,10 @@ let package = Package(
         // Test target
         .testTarget(
             name: "FileSystemKitTests",
-            dependencies: ["FileSystemKit"]
+            dependencies: ["FileSystemKit"],
+            resources: [
+                .copy("Resources")
+            ]
         ),
     ]
 )

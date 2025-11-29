@@ -89,7 +89,12 @@ public final class DiskImageAdapterRegistry {
     private var adaptersByExtension: [String: DiskImageAdapter.Type] = [:]
     
     private init() {
-        // Adapters will be registered as they are implemented
+        // Register default adapters
+        register(DMGImageAdapter.self)
+        register(ISO9660ImageAdapter.self)
+        register(VHDImageAdapter.self)
+        register(IMGImageAdapter.self)
+        register(RawDiskImageAdapter.self)
     }
     
     /// Register a disk image adapter
