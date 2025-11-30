@@ -34,7 +34,6 @@ final class DirectoryParserTests: XCTestCase {
         let options = DirectoryParserOptions(
             basePath: "",
             followSymlinks: false,
-            preserveSymlinks: true,
             includeSpecialFiles: false,
             skipPermissionErrors: false,
             skipHiddenFiles: true,
@@ -62,7 +61,6 @@ final class DirectoryParserTests: XCTestCase {
         let options = DirectoryParserOptions(
             basePath: "",
             followSymlinks: false,
-            preserveSymlinks: true,
             includeSpecialFiles: false,
             skipPermissionErrors: false,
             skipHiddenFiles: true,
@@ -96,7 +94,6 @@ final class DirectoryParserTests: XCTestCase {
         let options = DirectoryParserOptions(
             basePath: "",
             followSymlinks: false,
-            preserveSymlinks: true,
             includeSpecialFiles: false,
             skipPermissionErrors: false,
             skipHiddenFiles: true,
@@ -133,7 +130,6 @@ final class DirectoryParserTests: XCTestCase {
         let options = DirectoryParserOptions(
             basePath: "",
             followSymlinks: false,
-            preserveSymlinks: true,
             includeSpecialFiles: false,
             skipPermissionErrors: false,
             skipHiddenFiles: true,
