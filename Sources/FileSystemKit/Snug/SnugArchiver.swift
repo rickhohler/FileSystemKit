@@ -840,14 +840,8 @@ public class SnugArchiver {
         }
     }
     
-    // Helper function to normalize paths (Windows to Unix-style)
-    
-    // Helper function to get permissions from file URL
-        } catch {
-            // Ignore errors - permissions are optional
-        }
-        return nil
-    }
+
+    private func computeHash(data: Data) throws -> String {
     
     // Helper function to get owner and group from file URL
             if let groupName = attributes[.groupOwnerAccountName] as? String {
