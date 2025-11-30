@@ -503,7 +503,7 @@ public class SnugArchiver {
                         let chunkType = typeInfo.type
                         let contentType = typeInfo.contentType
                         
-                        let metadata = ChunkMetadata(
+                        let resolvedChunkMetadata = ChunkMetadata(
                             size: fileData.count,
                             contentHash: hash,
                             hashAlgorithm: hashAlgorithm,

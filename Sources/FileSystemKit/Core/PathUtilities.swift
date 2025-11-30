@@ -12,12 +12,17 @@ import Foundation
 public struct PathUtilities {
     /// Normalize a path to use forward slashes and remove redundant separators
     /// - Parameter path: Path to normalize
-    /// - Returns: Normalized path
+    /// - Returns: Normalized path (preserves leading slash for absolute paths)
     public static func normalize(_ path: String) -> String {
-        return path
+        let hasLeadingSlash = path.hasPrefix("/")
+        var normalized = path
             .replacingOccurrences(of: "\\", with: "/")
             .replacingOccurrences(of: "//", with: "/")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+        if hasLeadingSlash && !normalized.isEmpty {
+            normalized = "/" + normalized
+        }
+        return normalized
     }
     
     /// Get relative path from a base URL

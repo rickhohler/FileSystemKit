@@ -62,9 +62,13 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate)
         try parser.parse(tempDirectory)
         
-        XCTAssertEqual(entries.count, 2)
-        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "file1.txt" })
-        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "file2.txt" })
+        // Get all entries as an array for easier debugging
+        let allEntries = entries.compactMap { $0 as? DirectoryEntry }
+        let fileEntries = allEntries.filter { $0.type == "file" }
+        
+        XCTAssertEqual(fileEntries.count, 2, "Expected 2 files, found \(fileEntries.count). All entries: \(allEntries.map { $0.path })")
+        XCTAssertTrue(fileEntries.contains { $0.path == "file1.txt" })
+        XCTAssertTrue(fileEntries.contains { $0.path == "file2.txt" })
     }
     
     func testParseDirectoryWithSubdirectories() throws {
