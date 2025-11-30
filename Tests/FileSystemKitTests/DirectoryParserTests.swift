@@ -63,7 +63,7 @@ final class DirectoryParserTests: XCTestCase {
         try parser.parse(tempDirectory)
         
         // Get all entries as an array for easier debugging
-        let allEntries = entries.compactMap { $0 as? DirectoryEntry }
+        let allEntries = entries.filter { _ in true }
         let fileEntries = allEntries.filter { $0.type == "file" }
         
         XCTAssertEqual(fileEntries.count, 2, "Expected 2 files, found \(fileEntries.count). All entries: \(allEntries.map { $0.path })")
