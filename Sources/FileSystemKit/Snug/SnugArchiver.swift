@@ -332,7 +332,7 @@ public class SnugArchiver {
             .isRegularFileKey,
             .hasHiddenExtensionKey,
             .isUserImmutableKey,
-            .isSystemImmutableKey,
+            .capturedIsSystemImmutableKey,
             .fileSizeKey,
             .contentModificationDateKey,
             .creationDateKey,
@@ -541,9 +541,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: getPermissions(from: resolvedURL),
-                            owner: getOwnerAndGroup(from: resolvedURL).owner,
-                            group: getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: self.getPermissions(from: resolvedURL),
+                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
+                            group: self.getOwnerAndGroup(from: resolvedURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: false,
@@ -645,7 +645,7 @@ public class SnugArchiver {
                     let hash = try computeHash(data: fileData)
                     
                     // Determine if this should be embedded (system files when embedSystemFiles is true)
-                    let shouldEmbed = embedSystemFiles && (isSystem || isHidden || isSystemFile(relativePath))
+                    let shouldEmbed = embedSystemFiles && (capturedIsSystem || capturedIsHidden || capturedIsSystemFile(relativePath))
                     
                     if shouldEmbed {
                         // Embed file directly in archive
@@ -657,9 +657,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: getPermissions(from: fileURL),
-                            owner: getOwnerAndGroup(from: resolvedURL).owner,
-                            group: getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: self.getPermissions(from: fileURL),
+                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
+                            group: self.getOwnerAndGroup(from: resolvedURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: true,
@@ -738,9 +738,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: getPermissions(from: fileURL),
-                            owner: getOwnerAndGroup(from: resolvedURL).owner,
-                            group: getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: self.getPermissions(from: fileURL),
+                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
+                            group: self.getOwnerAndGroup(from: resolvedURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: false,
@@ -799,7 +799,7 @@ public class SnugArchiver {
     
     
     // Helper function to detect system files
-    private func isSystemFile(_ path: String) -> Bool {
+    private func capturedIsSystemFile(_ path: String) -> Bool {
         let systemPaths = [
             "System Volume Information",
             "$RECYCLE.BIN",
