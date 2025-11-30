@@ -117,7 +117,7 @@ public class SnugArchiver {
         var embeddedFiles: [(hash: String, data: Data, path: String)] = []
         
         // First pass: count files for progress
-        let totalFileCount = try countFiles(in: sourceURL, ignoreMatcher: ignoreMatcher)
+        let totalFileCount = try FileCounter.countFiles(in: sourceURL, ignoreMatcher: ignoreMatcher)
         
         // Report processing phase
         reportProgress(
@@ -292,37 +292,6 @@ public class SnugArchiver {
     }
     
     // Helper function to count files for progress estimation
-    private func countFiles(in url: URL, ignoreMatcher: SnugIgnoreMatcher?) throws -> Int {
-        var count = 0
-        let resourceKeys: [URLResourceKey] = [.isDirectoryKey, .isRegularFileKey]
-        
-        let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: resourceKeys,
-            options: [.skipsHiddenFiles],
-            errorHandler: { _, _ in true }
-        )
-        
-        guard let enumerator = enumerator else {
-            return 0
-        }
-        
-        for case let fileURL as URL in enumerator {
-            let relativePath = fileURL.path.replacingOccurrences(of: url.path, with: "")
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            
-            if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
-                continue // Skip ignored files
-            }
-            
-            let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys))
-            if resourceValues?.isRegularFile == true {
-                count += 1
-            }
-        }
-        
-        return count
-    }
     
     // Helper function to report progress
     private func reportProgress(
@@ -402,9 +371,7 @@ public class SnugArchiver {
         
         for case let fileURL as URL in enumerator {
             // Normalize path to Unix-style (handle Windows paths)
-            var relativePath = fileURL.path.replacingOccurrences(of: url.path, with: basePath)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            // Path already normalized by PathUtilities.relativePath
+            let relativePath = PathUtilities.relativePath(from: fileURL, baseURL: url, basePath: basePath)
             
             // Check ignore patterns
             if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
@@ -533,6 +500,8 @@ public class SnugArchiver {
                         
                         // Detect if this is a disk image file
                         let typeInfo = FileTypeDetector.detect(for: resolvedURL, data: fileData)
+                        let chunkType = typeInfo.type
+                        let contentType = typeInfo.contentType
                         
                         let metadata = ChunkMetadata(
                             size: fileData.count,
@@ -695,18 +664,18 @@ public class SnugArchiver {
                         // Embed file directly in archive
                         embeddedFiles.append((hash: hash, data: fileData, path: relativePath))
                         
-                        let (owner, group) = self.FileMetadataCollector.getOwnerAndGroup(from: fileURL)
+                        let metadata = FileMetadataCollector.collect(from: fileURL)
                         let entry = ArchiveEntry(
                             type: "file",
                             path: relativePath,
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: self.FileMetadataCollector.getPermissions(from: fileURL),
-                            owner: owner,
-                            group: group,
-                            modified: resourceValues.contentModificationDate,
-                            created: resourceValues.creationDate,
+                            permissions: metadata.permissions,
+                            owner: metadata.owner,
+                            group: metadata.group,
+                            modified: metadata.modified ?? resourceValues.contentModificationDate,
+                            created: metadata.created ?? resourceValues.creationDate,
                             embedded: true,
                             embeddedOffset: nil  // Will be set later
                         )
@@ -737,8 +706,10 @@ public class SnugArchiver {
                 
                 // Detect if this is a disk image file
                 let typeInfo = FileTypeDetector.detect(for: fileURL, data: fileData)
+                let chunkType = typeInfo.type
+                let contentType = typeInfo.contentType
                 
-                let metadata = ChunkMetadata(
+                let chunkMetadata = ChunkMetadata(
                     size: fileData.count,
                     contentHash: hash,
                     hashAlgorithm: hashAlgorithm,
@@ -755,7 +726,7 @@ public class SnugArchiver {
                 
                 Task { [chunkStorage] in
                     do {
-                        _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: metadata)
+                        _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: chunkMetadata)
                         semaphore.signal()
                     } catch {
                         errorHolder.error = error
@@ -780,18 +751,18 @@ public class SnugArchiver {
                 }
                 
                 // File entry (hash storage)
-                let (owner, group) = self.FileMetadataCollector.getOwnerAndGroup(from: fileURL)
+                let fileMetadata = FileMetadataCollector.collect(from: fileURL)
                 let entry = ArchiveEntry(
                     type: "file",
                     path: relativePath,
                     hash: hash,
                     size: fileData.count,
                     target: nil,
-                    permissions: self.FileMetadataCollector.getPermissions(from: fileURL),
-                    owner: owner,
-                    group: group,
-                    modified: resourceValues.contentModificationDate,
-                    created: resourceValues.creationDate,
+                    permissions: fileMetadata.permissions,
+                    owner: fileMetadata.owner,
+                    group: fileMetadata.group,
+                    modified: fileMetadata.modified ?? resourceValues.contentModificationDate,
+                    created: fileMetadata.created ?? resourceValues.creationDate,
                     embedded: false,
                     embeddedOffset: nil
                 )
@@ -839,22 +810,6 @@ public class SnugArchiver {
             }
         }
     }
-    
-
-    private func computeHash(data: Data) throws -> String {
-    
-    // Helper function to get owner and group from file URL
-            if let groupName = attributes[.groupOwnerAccountName] as? String {
-                group = groupName
-            }
-        } catch {
-            // Ignore errors - owner/group are optional
-        }
-        
-        return (owner, group)
-    }
-    
-    // Helper function to detect system files
     
     private func computeHash(data: Data) throws -> String {
         switch hashAlgorithm.lowercased() {
@@ -960,60 +915,6 @@ extension Data {
 
 // MARK: - SnugArchiver Chunk Type Detection Extension
 
-extension SnugArchiver {
-    /// Detect chunk type and content type for a file
-    /// Uses the same detection logic as DiskImageAdapter implementations
-    /// - Parameters:
-    ///   - url: File URL
-    ///   - data: File data (may be partial for detection)
-    /// - Returns: Tuple of (chunkType, contentType)
-            }
-        }
-        
-        // ISO 9660 (CD-ROM/DVD-ROM)
-        if fileExtension == "iso" || fileExtension == "img" {
-            if data.count >= 32769 { // ISO 9660 volume descriptor starts at sector 16 (32768 bytes)
-                let vdsStart = 32768
-                if data.count >= vdsStart + 1 && data[vdsStart] == 0x01 {
-                    // Primary Volume Descriptor
-                    return ("disk-image", "application/x-iso9660-image")
-                }
-            }
-            // Check for ISO 9660 signature at offset 32769
-            if data.count >= 32773 {
-                let signature = String(data: data.subdata(in: 32769..<32773), encoding: .isoLatin1) ?? ""
-                if signature == "CD001" {
-                    return ("disk-image", "application/x-iso9660-image")
-                }
-            }
-        }
-        
-        // VHD (Virtual Hard Disk)
-        if fileExtension == "vhd" {
-            if data.count >= 512 {
-                let footer = data.subdata(in: (data.count - 512)..<data.count)
-                if footer.count >= 8 {
-                    let signature = String(data: footer[0..<8], encoding: .ascii) ?? ""
-                    if signature == "conectix" {
-                        return ("disk-image", "application/x-vhd")
-                    }
-                }
-            }
-        }
-        
-        // Raw disk image (IMG) - check if size suggests a disk image
-        if fileExtension == "img" {
-            let size = data.count
-            if size > 0 && (size % 512 == 0 || size == 1440 * 1024 || size == 2880 * 1024) {
-                // Could be a raw disk image
-                return ("disk-image", "application/octet-stream")
-            }
-        }
-        
-        // Default to regular file
-        return ("file", nil)
-    }
-}
 
 
 // MARK: - Helper Classes

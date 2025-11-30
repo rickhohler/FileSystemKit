@@ -4,7 +4,7 @@
 import Foundation
 
 /// Pattern matcher for ignore rules (similar to .gitignore)
-public struct SnugIgnoreMatcher: Sendable {
+public struct SnugIgnoreMatcher: Sendable, IgnoreMatcher {
     private let patterns: [IgnorePattern]
     
     public init(patterns: [String]) {
