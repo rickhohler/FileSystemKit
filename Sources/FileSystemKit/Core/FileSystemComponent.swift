@@ -632,7 +632,15 @@ extension FileSystemFolder {
     }
 }
 
-// MARK: - Backward Compatibility Typealiases (Removed)
-// The File and FileMetadata typealiases have been removed.
-// Use FileSystemEntry and FileSystemEntryMetadata instead.
+// MARK: - Backward Compatibility Typealiases
+
+/// Deprecated: Use `FileSystemEntry` instead.
+/// This typealias is provided for backward compatibility and will be removed in a future major version.
+@available(*, deprecated, renamed: "FileSystemEntry", message: "Use FileSystemEntry instead to avoid naming conflicts")
+public typealias File = FileSystemEntry
+
+/// Deprecated: Use `FileSystemEntryMetadata` instead.
+/// This typealias is provided for backward compatibility and will be removed in a future major version.
+@available(*, deprecated, renamed: "FileSystemEntryMetadata", message: "Use FileSystemEntryMetadata instead to avoid naming conflicts")
+public typealias FileMetadata = FileSystemEntryMetadata
 
