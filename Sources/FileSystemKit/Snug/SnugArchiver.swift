@@ -797,13 +797,6 @@ public class SnugArchiver {
             .replacingOccurrences(of: "//", with: "/")
     }
     
-    // Helper function to get permissions string
-    private func getPermissions(from resourceValues: URLResourceValues) -> String? {
-        if let posixPerms = resourceValues.posixPermissions {
-            return String(format: "%o", posixPerms.rawValue)
-        }
-        return nil
-    }
     
     // Helper function to detect system files
     private func isSystemFile(_ path: String) -> Bool {
