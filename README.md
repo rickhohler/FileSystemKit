@@ -17,7 +17,7 @@ A Swift package providing modern file system and disk image format support. File
 - **File Extension Registry**: Centralized file extension management
 - **Chunk Storage**: Efficient binary data storage abstraction
 - **Metadata Storage**: Metadata storage abstraction for disk image information
-- **SNUG Archive Support**: Content-addressable archive format with metadata persistence
+- **Snug Archive Support**: Content-addressable archive format with metadata persistence
 - **Multi-Storage Configuration**: Primary, secondary, glacier, and mirror storage volume types
 
 ## Architecture
@@ -46,13 +46,17 @@ FileSystemKit implements a three-layer architecture:
 - StuffIt (.sit, .sitx)
 - ShrinkIt (.shk, .sdk)
 - Archive.org (.archiveorg) - Directory structures containing disk images
-- SNUG (.snug) - Content-addressable archive format
+- Snug (.snug) - Content-addressable archive format
 
 ### File System Formats (Layer 3)
 - ISO 9660 (CD-ROM/DVD-ROM file systems)
 - FAT32 (Modern FAT32 support)
 - NTFS (Future)
 - exFAT (Future)
+
+## Roadmap
+
+For information about future development plans, priorities, and milestones, see [ROADMAP.md](ROADMAP.md).
 
 ## Installation
 
