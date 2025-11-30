@@ -57,7 +57,7 @@ public actor FileHashCache {
         self.maxCacheSize = maxCacheSize
         
         // Load cache from disk if available
-        if let cacheFileURL = cacheFileURL {
+        if cacheFileURL != nil {
             Task {
                 await loadCache()
             }
