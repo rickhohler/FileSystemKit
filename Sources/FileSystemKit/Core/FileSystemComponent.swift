@@ -100,11 +100,11 @@ public struct FileHash: Hashable, Codable {
     }
 }
 
-// MARK: - FileMetadata
+// MARK: - FileSystemEntryMetadata
 
-/// File metadata (always loaded, lightweight)
+/// Metadata for a file system entry (file or directory)
 /// Separated from file content for efficient batch processing
-public struct FileMetadata: Codable {
+public struct FileSystemEntryMetadata: Codable {
     /// File name
     public let name: String
     
@@ -120,8 +120,8 @@ public struct FileMetadata: Codable {
     /// Additional attributes (system-specific)
     public var attributes: [String: Any]
     
-    /// Location of file data in disk image
-    public let location: FileLocation
+    /// Location of file data in disk image (optional - not all entries have disk image location)
+    public let location: FileLocation?
     
     /// Hashes for this file (lazy-computed, cached here)
     public var hashes: [HashAlgorithm: FileHash]
@@ -132,7 +132,7 @@ public struct FileMetadata: Codable {
         modificationDate: Date? = nil,
         fileType: FileTypeCategory? = nil,
         attributes: [String: Any] = [:],
-        location: FileLocation,
+        location: FileLocation? = nil,
         hashes: [HashAlgorithm: FileHash] = [:]
     ) {
         self.name = name
@@ -155,7 +155,7 @@ public struct FileMetadata: Codable {
         size = try container.decode(Int.self, forKey: .size)
         modificationDate = try container.decodeIfPresent(Date.self, forKey: .modificationDate)
         fileType = try container.decodeIfPresent(FileTypeCategory.self, forKey: .fileType)
-        location = try container.decode(FileLocation.self, forKey: .location)
+        location = try container.decodeIfPresent(FileLocation.self, forKey: .location)
         hashes = try container.decode([HashAlgorithm: FileHash].self, forKey: .hashes)
         attributes = [:] // Attributes not encoded (Any type not Codable)
     }
@@ -166,19 +166,23 @@ public struct FileMetadata: Codable {
         try container.encode(size, forKey: .size)
         try container.encodeIfPresent(modificationDate, forKey: .modificationDate)
         try container.encodeIfPresent(fileType, forKey: .fileType)
-        try container.encode(location, forKey: .location)
+        try container.encodeIfPresent(location, forKey: .location)
         try container.encode(hashes, forKey: .hashes)
         // Attributes not encoded (Any type not Codable)
     }
 }
 
-// MARK: - File
+// MARK: - FileSystemEntry
 
-/// Represents a file in a file system.
+/// Represents an entry in a file system (file or directory).
 /// Implements lazy loading: metadata is always loaded, content is loaded on demand.
-public class File: FileSystemComponent {
-    /// File metadata (always loaded, lightweight)
-    public let metadata: FileMetadata
+public class FileSystemEntry: FileSystemComponent {
+    /// Entry metadata (always loaded, lightweight)
+    public let metadata: FileSystemEntryMetadata
+    
+    /// Reference to the chunk containing file data (if applicable)
+    /// This links the file system entry to its binary data in ChunkStorage
+    public let chunkIdentifier: ChunkIdentifier?
     
     /// File name (from metadata)
     public var name: String { metadata.name }
@@ -198,10 +202,13 @@ public class File: FileSystemComponent {
     /// Cached raw disk data (for reading file content)
     private weak var _cachedDiskData: RawDiskData?
     
-    /// Initialize a file with metadata
-    /// - Parameter metadata: File metadata (always loaded)
-    public init(metadata: FileMetadata) {
+    /// Initialize a file system entry with metadata
+    /// - Parameters:
+    ///   - metadata: Entry metadata (always loaded)
+    ///   - chunkIdentifier: Optional reference to chunk containing file data
+    public init(metadata: FileSystemEntryMetadata, chunkIdentifier: ChunkIdentifier? = nil) {
         self.metadata = metadata
+        self.chunkIdentifier = chunkIdentifier
     }
     
     /// Read file content (lazy-loaded).
@@ -219,7 +226,9 @@ public class File: FileSystemComponent {
         }
         
         // Load data from disk based on location
-        let location = metadata.location
+        guard let location = metadata.location else {
+            throw FileSystemError.diskDataNotAvailable
+        }
         let data = try diskData.readData(at: location.offset, length: location.length)
         
         // Cache loaded data
@@ -271,6 +280,22 @@ public class File: FileSystemComponent {
     /// Traverse this file (returns just itself)
     public func traverse() -> [FileSystemComponent] {
         return [self]
+    }
+    
+    /// Create a Chunk from this entry's chunk identifier
+    /// - Parameters:
+    ///   - storage: ChunkStorage to use for accessing chunk data
+    ///   - accessPattern: Access pattern for caching (default: onDemand)
+    /// - Returns: Chunk instance if chunkIdentifier is available, nil otherwise
+    public func toChunk(storage: any ChunkStorage, accessPattern: AccessPattern = .onDemand) async throws -> Chunk? {
+        guard let identifier = chunkIdentifier else {
+            return nil
+        }
+        return try await Chunk.builder()
+            .storage(storage)
+            .identifier(identifier)
+            .accessPattern(accessPattern)
+            .build()
     }
     
     // MARK: - Private Helpers
@@ -440,8 +465,8 @@ extension FileSystemFolder {
     
     /// Get all files and folders in this folder (non-recursive)
     /// - Returns: Tuple containing files and folders
-    public func getContents() -> (files: [File], folders: [FileSystemFolder]) {
-        var files: [File] = []
+    public func getContents() -> (files: [FileSystemEntry], folders: [FileSystemFolder]) {
+        var files: [FileSystemEntry] = []
         var folders: [FileSystemFolder] = []
         
         for child in children {
@@ -458,8 +483,8 @@ extension FileSystemFolder {
     /// Find a file by name in this directory
     /// - Parameter name: File name to search for
     /// - Returns: Found File, or nil if not found
-    public func getFile(named name: String) -> File? {
-        return findChild(named: name) as? File
+    public func getFile(named name: String) -> FileSystemEntry? {
+        return findChild(named: name) as? FileSystemEntry
     }
     
     /// Find a folder by name in this folder
@@ -561,4 +586,16 @@ extension FileSystemFolder {
         return "/" + components.joined(separator: "/")
     }
 }
+
+// MARK: - Backward Compatibility Typealiases
+
+/// Backward compatibility: File is now FileSystemEntry
+/// Use FileSystemEntry in new code
+@available(*, deprecated, renamed: "FileSystemEntry", message: "Use FileSystemEntry instead to avoid naming conflicts")
+public typealias File = FileSystemEntry
+
+/// Backward compatibility: FileMetadata is now FileSystemEntryMetadata
+/// Use FileSystemEntryMetadata in new code
+@available(*, deprecated, renamed: "FileSystemEntryMetadata", message: "Use FileSystemEntryMetadata instead for clarity")
+public typealias FileMetadata = FileSystemEntryMetadata
 

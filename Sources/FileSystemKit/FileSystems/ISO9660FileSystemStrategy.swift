@@ -126,7 +126,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     }
     
     /// Read file content from raw disk data
-    public func readFile(_ file: File, from diskData: RawDiskData) throws -> Data {
+    public func readFile(_ file: FileSystemEntry, from diskData: RawDiskData) throws -> Data {
         let location = file.metadata.location
         
         // Extract ISO data from sectors
@@ -153,7 +153,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     }
     
     /// Write file content to raw disk data
-    public func writeFile(_ data: Data, as file: File, to diskData: inout RawDiskData) throws {
+    public func writeFile(_ data: Data, as file: FileSystemEntry, to diskData: inout RawDiskData) throws {
         // ISO 9660 is read-only (CD-ROM standard)
         throw FileSystemError.unsupportedFileSystemFormat(format: nil)
     }

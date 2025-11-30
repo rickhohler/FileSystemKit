@@ -98,22 +98,22 @@ public protocol FileSystemStrategy {
     
     /// Read file content from storage using ChunkStorage.
     /// - Parameters:
-    ///   - file: File object (with metadata and location)
+    ///   - file: FileSystemEntry object (with metadata and location)
     ///   - chunkStorage: ChunkStorage provider for reading binary data
     ///   - identifier: ChunkIdentifier for the file content
     /// - Returns: File content as Data
     /// - Throws: Error if file cannot be read
-    func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
+    func readFile(_ file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
     
     /// Write file content to storage using ChunkStorage.
     /// - Parameters:
     ///   - data: File content to write
-    ///   - file: File object (with metadata and location)
+    ///   - file: FileSystemEntry object (with metadata and location)
     ///   - chunkStorage: ChunkStorage provider for writing binary data
     ///   - identifier: ChunkIdentifier for the file content
     /// - Returns: The ChunkIdentifier of the stored file content
     /// - Throws: Error if file cannot be written
-    func writeFile(_ data: Data, as file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> ChunkIdentifier
+    func writeFile(_ data: Data, as file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> ChunkIdentifier
     
     // MARK: - Legacy methods (for backward compatibility)
     
@@ -156,7 +156,7 @@ public protocol FileSystemStrategy {
 extension FileSystemStrategy {
     /// Default implementation: Read file from ChunkStorage
     /// Converts ChunkIdentifier to diskData-based read for backward compatibility
-    public func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data {
+    public func readFile(_ file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data {
         // Read chunk data
         guard let data = try await chunkStorage.readChunk(identifier) else {
             throw FileSystemError.fileNotFound(path: "chunk:\(identifier.id)")
@@ -169,7 +169,7 @@ extension FileSystemStrategy {
     
     /// Default implementation: Write file to ChunkStorage
     /// Converts to diskData-based write for backward compatibility, then stores in ChunkStorage
-    public func writeFile(_ data: Data, as file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> ChunkIdentifier {
+    public func writeFile(_ data: Data, as file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> ChunkIdentifier {
         // Store directly in ChunkStorage
         // Note: Legacy writeFile modifies diskData in place, but we're storing the file content directly
         let chunkMetadata = ChunkMetadata(
