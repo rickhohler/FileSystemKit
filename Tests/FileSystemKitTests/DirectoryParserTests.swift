@@ -24,7 +24,7 @@ final class DirectoryParserTests: XCTestCase {
     // MARK: - Basic Parsing Tests
     
     func testParseEmptyDirectory() throws {
-        let entries = NSMutableArray()
+        let entries = NSLockedArray<DirectoryEntry>()
         let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
@@ -63,9 +63,8 @@ final class DirectoryParserTests: XCTestCase {
         try parser.parse(tempDirectory)
         
         XCTAssertEqual(entries.count, 2)
-        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
-        XCTAssertTrue(entryArray.contains { $0.path == "file1.txt" })
-        XCTAssertTrue(entryArray.contains { $0.path == "file2.txt" })
+        XCTAssertTrue(entries.contains { $0.path == "file1.txt" })
+        XCTAssertTrue(entries.contains { $0.path == "file2.txt" })
     }
     
     func testParseDirectoryWithSubdirectories() throws {
@@ -94,10 +93,9 @@ final class DirectoryParserTests: XCTestCase {
         
         // Should find directory, file in root, and file in subdir
         XCTAssertTrue(entries.count >= 3)
-        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
-        XCTAssertTrue(entryArray.contains { $0.type == "directory" && $0.path == "subdir" })
-        XCTAssertTrue(entryArray.contains { $0.path == "file.txt" })
-        XCTAssertTrue(entryArray.contains { $0.path == "subdir/subfile.txt" })
+        XCTAssertTrue(entries.contains { $0.type == "directory" && $0.path == "subdir" })
+        XCTAssertTrue(entries.contains { $0.path == "file.txt" })
+        XCTAssertTrue(entries.contains { $0.path == "subdir/subfile.txt" })
     }
     
     // MARK: - Ignore Pattern Tests
@@ -126,26 +124,55 @@ final class DirectoryParserTests: XCTestCase {
         try parser.parse(tempDirectory)
         
         XCTAssertEqual(entries.count, 2)
-        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
-        XCTAssertFalse(entryArray.contains { $0.path == "ignore.txt" })
+        XCTAssertFalse(entries.contains { $0.path == "ignore.txt" })
     }
     
     // MARK: - Helper Class
     
     private final class TestDirectoryParserDelegate: DirectoryParserDelegate {
-        private let entries: NSMutableArray
+        private let entries: NSLockedArray<DirectoryEntry>
         
-        init(entries: NSMutableArray) {
+        init(entries: NSLockedArray<DirectoryEntry>) {
             self.entries = entries
         }
         
         func processEntry(_ entry: DirectoryEntry) throws -> Bool {
-            entries.add(entry)
+            entries.append(entry)
             return true
         }
         
         func handleError(url: URL, error: Error) -> Bool {
             return true // Continue on error
+        }
+    }
+    
+    // Thread-safe array wrapper
+    private final class NSLockedArray<T>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var array: [T] = []
+        
+        func append(_ element: T) {
+            lock.lock()
+            defer { lock.unlock() }
+            array.append(element)
+        }
+        
+        var count: Int {
+            lock.lock()
+            defer { lock.unlock() }
+            return array.count
+        }
+        
+        func compactMap<U>(_ transform: (T) -> U?) -> [U] {
+            lock.lock()
+            defer { lock.unlock() }
+            return array.compactMap(transform)
+        }
+        
+        func contains(where predicate: (T) -> Bool) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return array.contains(where: predicate)
         }
     }
 }
