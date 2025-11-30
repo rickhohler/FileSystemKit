@@ -24,12 +24,8 @@ final class DirectoryParserTests: XCTestCase {
     // MARK: - Basic Parsing Tests
     
     func testParseEmptyDirectory() throws {
-        var entries: [DirectoryEntry] = []
-        let entriesPtr = UnsafeMutablePointer<[DirectoryEntry]>.allocate(capacity: 1)
-        entriesPtr.initialize(to: entries)
-        defer { entriesPtr.deallocate() }
-        
-        let delegate = TestDirectoryParserDelegate(entries: entriesPtr)
+        let entries = NSMutableArray()
+        let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
             basePath: "",
@@ -43,7 +39,6 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate)
         try parser.parse(tempDirectory)
         
-        entries = entriesPtr.pointee
         XCTAssertEqual(entries.count, 0)
     }
     
@@ -52,12 +47,8 @@ final class DirectoryParserTests: XCTestCase {
         try "test1".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file1.txt"))
         try "test2".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file2.txt"))
         
-        var entries: [DirectoryEntry] = []
-        let entriesPtr = UnsafeMutablePointer<[DirectoryEntry]>.allocate(capacity: 1)
-        entriesPtr.initialize(to: entries)
-        defer { entriesPtr.deallocate() }
-        
-        let delegate = TestDirectoryParserDelegate(entries: entriesPtr)
+        let entries = NSMutableArray()
+        let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
             basePath: "",
@@ -71,10 +62,10 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate)
         try parser.parse(tempDirectory)
         
-        entries = entriesPtr.pointee
         XCTAssertEqual(entries.count, 2)
-        XCTAssertTrue(entries.contains { $0.path == "file1.txt" })
-        XCTAssertTrue(entries.contains { $0.path == "file2.txt" })
+        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
+        XCTAssertTrue(entryArray.contains { $0.path == "file1.txt" })
+        XCTAssertTrue(entryArray.contains { $0.path == "file2.txt" })
     }
     
     func testParseDirectoryWithSubdirectories() throws {
@@ -86,12 +77,8 @@ final class DirectoryParserTests: XCTestCase {
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file.txt"))
         try "test".data(using: .utf8)!.write(to: subDir.appendingPathComponent("subfile.txt"))
         
-        var entries: [DirectoryEntry] = []
-        let entriesPtr = UnsafeMutablePointer<[DirectoryEntry]>.allocate(capacity: 1)
-        entriesPtr.initialize(to: entries)
-        defer { entriesPtr.deallocate() }
-        
-        let delegate = TestDirectoryParserDelegate(entries: entriesPtr)
+        let entries = NSMutableArray()
+        let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
             basePath: "",
@@ -105,12 +92,12 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate)
         try parser.parse(tempDirectory)
         
-        entries = entriesPtr.pointee
         // Should find directory, file in root, and file in subdir
         XCTAssertTrue(entries.count >= 3)
-        XCTAssertTrue(entries.contains { $0.type == "directory" && $0.path == "subdir" })
-        XCTAssertTrue(entries.contains { $0.path == "file.txt" })
-        XCTAssertTrue(entries.contains { $0.path == "subdir/subfile.txt" })
+        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
+        XCTAssertTrue(entryArray.contains { $0.type == "directory" && $0.path == "subdir" })
+        XCTAssertTrue(entryArray.contains { $0.path == "file.txt" })
+        XCTAssertTrue(entryArray.contains { $0.path == "subdir/subfile.txt" })
     }
     
     // MARK: - Ignore Pattern Tests
@@ -121,12 +108,8 @@ final class DirectoryParserTests: XCTestCase {
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file2.txt"))
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("ignore.txt"))
         
-        var entries: [DirectoryEntry] = []
-        let entriesPtr = UnsafeMutablePointer<[DirectoryEntry]>.allocate(capacity: 1)
-        entriesPtr.initialize(to: entries)
-        defer { entriesPtr.deallocate() }
-        
-        let delegate = TestDirectoryParserDelegate(entries: entriesPtr)
+        let entries = NSMutableArray()
+        let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let ignoreMatcher = SnugIgnoreMatcher(patterns: ["ignore.txt"])
         
@@ -142,22 +125,22 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate, ignoreMatcher: ignoreMatcher)
         try parser.parse(tempDirectory)
         
-        entries = entriesPtr.pointee
         XCTAssertEqual(entries.count, 2)
-        XCTAssertFalse(entries.contains { $0.path == "ignore.txt" })
+        let entryArray = entries.compactMap { $0 as? DirectoryEntry }
+        XCTAssertFalse(entryArray.contains { $0.path == "ignore.txt" })
     }
     
     // MARK: - Helper Class
     
     private final class TestDirectoryParserDelegate: DirectoryParserDelegate {
-        private let entries: UnsafeMutablePointer<[DirectoryEntry]>
+        private let entries: NSMutableArray
         
-        init(entries: UnsafeMutablePointer<[DirectoryEntry]>) {
+        init(entries: NSMutableArray) {
             self.entries = entries
         }
         
         func processEntry(_ entry: DirectoryEntry) throws -> Bool {
-            entries.pointee.append(entry)
+            entries.add(entry)
             return true
         }
         
