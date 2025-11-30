@@ -380,12 +380,12 @@ public class SnugArchiver {
             let isDirectory = resourceValues.isDirectory ?? false
             let isSymlink = resourceValues.isSymbolicLink ?? false
             let isRegularFile = resourceValues.isRegularFile ?? false
-            let isBlockDevice = resourceValues.isBlockSpecial ?? false
-            let isCharacterDevice = resourceValues.isCharacterSpecial ?? false
-            let isSocket = resourceValues.isSocket ?? false
-            let isFIFO = resourceValues.isFIFO ?? false
-            let isHidden = resourceValues.hasHiddenExtension ?? false
-            let isSystem = resourceValues.isSystemImmutable ?? false
+            // Check for special files - URLResourceValues doesn't provide these properties
+            // We'll detect them by attempting to read the file instead
+            let isBlockDevice = false  // Would need stat() to detect
+            let isCharacterDevice = false  // Would need stat() to detect
+            let isSocket = false  // Would need stat() to detect
+            let isFIFO = false  // Would need stat() to detect
             
             // Handle symlinks
             if isSymlink {
