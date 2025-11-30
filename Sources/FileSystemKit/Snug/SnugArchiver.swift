@@ -1077,7 +1077,7 @@ private final class ErrorHolder: @unchecked Sendable {
 // Helper class for thread-safe processing result storage
 private final class ProcessingResultHolder: @unchecked Sendable {
     var entries: [ArchiveEntry] = []
-    var hashRegistry: [String: HashDefinition] = []
+    var hashRegistry: [String: HashDefinition] = [:]
     var processedHashes: Set<String> = []
     var totalSize: Int = 0
     var embeddedFiles: [(hash: String, data: Data, path: String)] = []
