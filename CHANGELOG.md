@@ -10,6 +10,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Future enhancements and features
 
+## [1.1.1] - 2025-11-29
+
+### Fixed
+- Fixed metadata merging logic to prevent duplicate path entries
+- Removed redundant `originalFilename` insertion in `originalPaths` during metadata merging
+- Fixed GitHub Actions workflow to use `macos-latest` for better compatibility
+- All compilation errors resolved
+- All unit tests passing (172 tests, 0 failures)
+
+### Changed
+- Updated GitHub Actions runner from `macos-15` to `macos-latest` for compatibility
+
 ## [1.1.0] - 2025-11-29
 
 ### Added
