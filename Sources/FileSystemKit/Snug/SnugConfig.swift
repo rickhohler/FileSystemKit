@@ -24,18 +24,30 @@ public struct SnugConfig: Codable, Sendable {
     /// Fail if primary storage is unavailable (default: true for configured locations)
     public var failIfPrimaryUnavailable: Bool
     
+    /// Storage provider identifier for custom backends (e.g., "cloudkit", "s3", "filesystem")
+    /// If set, uses ChunkStorageProviderRegistry to create storage instead of file system
+    public var storageProviderIdentifier: String?
+    
+    /// Storage provider configuration dictionary
+    /// Passed to ChunkStorageProvider.createChunkStorage()
+    public var storageProviderConfiguration: [String: String]?
+    
     public init(
         storageLocations: [StorageLocation] = [],
         defaultHashAlgorithm: String? = nil,
         enableMirroring: Bool = false,
         mirrorLocations: [String] = [],
-        failIfPrimaryUnavailable: Bool = true
+        failIfPrimaryUnavailable: Bool = true,
+        storageProviderIdentifier: String? = nil,
+        storageProviderConfiguration: [String: String]? = nil
     ) {
         self.storageLocations = storageLocations
         self.defaultHashAlgorithm = defaultHashAlgorithm
         self.enableMirroring = enableMirroring
         self.mirrorLocations = mirrorLocations
         self.failIfPrimaryUnavailable = failIfPrimaryUnavailable
+        self.storageProviderIdentifier = storageProviderIdentifier
+        self.storageProviderConfiguration = storageProviderConfiguration
     }
 }
 
@@ -507,13 +519,13 @@ extension SnugConfigManager {
                 } else {
                     unavailable.append(location)
                     if location.required {
-                        throw SnugError.storageError("Required storage location is not writable: \(location.path)")
+                        throw SnugError.storageError("Required storage location is not writable: \(location.path)", nil)
                     }
                 }
             } else {
                 unavailable.append(location)
                 if location.required {
-                    throw SnugError.storageError("Required storage location does not exist: \(location.path)")
+                    throw SnugError.storageError("Required storage location does not exist: \(location.path)", nil)
                 }
             }
         }
@@ -536,7 +548,7 @@ extension SnugConfigManager {
     public static func getPrimaryStorageLocation(from config: SnugConfig? = nil) throws -> StorageLocation {
         let available = try getAvailableStorageLocations(from: config)
         guard let primary = available.first else {
-            throw SnugError.storageError("No storage locations available")
+            throw SnugError.storageError("No storage locations available", nil)
         }
         return primary
     }

@@ -266,7 +266,7 @@ final class FileHashCacheTests: XCTestCase {
         // Wait for async load
         try await Task.sleep(nanoseconds: 200_000_000)
         
-        let (count, _, _) = await loadedCache.getStats()
+        let (count, _) = await loadedCache.getStats()
         XCTAssertEqual(count, 0, "Invalid entries should be filtered out")
     }
     
@@ -280,7 +280,7 @@ final class FileHashCacheTests: XCTestCase {
         // Wait for async load
         try await Task.sleep(nanoseconds: 200_000_000)
         
-        let (count, _, _) = await loadedCache.getStats()
+        let (count, _) = await loadedCache.getStats()
         XCTAssertEqual(count, 0, "Cache should start fresh when file is corrupted")
     }
     
@@ -299,7 +299,7 @@ final class FileHashCacheTests: XCTestCase {
         let attrs2 = try FileManager.default.attributesOfItem(atPath: testFile2.path)
         await hashCache.setHash("hash2", for: testFile2, fileSize: attrs2[.size] as! Int64, modificationTime: attrs2[.modificationDate] as! Date)
         
-        let (count, maxSize, _) = await hashCache.getStats()
+        let (count, maxSize) = await hashCache.getStats()
         XCTAssertEqual(count, 2, "Stats should reflect number of cached entries")
         XCTAssertEqual(maxSize, 100, "Stats should reflect max cache size")
     }
@@ -340,7 +340,7 @@ final class FileHashCacheTests: XCTestCase {
         
         await hashCache.clear()
         
-        let (count, _, _) = await hashCache.getStats()
+        let (count, _) = await hashCache.getStats()
         XCTAssertEqual(count, 0, "Cache should be empty after clear")
         
         let hash1 = await hashCache.getHash(for: testFile1)
@@ -375,7 +375,7 @@ final class FileHashCacheTests: XCTestCase {
         }
         
         // Verify all hashes are cached
-        let (count, _, _) = await hashCache.getStats()
+        let (count, _) = await hashCache.getStats()
         XCTAssertEqual(count, 10, "All concurrent writes should succeed")
         
         for (index, file) in testFiles.enumerated() {

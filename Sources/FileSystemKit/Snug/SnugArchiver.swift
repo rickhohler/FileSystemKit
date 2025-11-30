@@ -17,11 +17,23 @@ import CryptoKit
 public class SnugArchiver {
     let storageURL: URL
     let hashAlgorithm: String
-    let chunkStorage: ChunkStorage
+    let chunkStorage: any ChunkStorage
     var progressCallback: SnugProgressCallback?
     let hashCache: FileHashCache
     
-    public init(storageURL: URL, hashAlgorithm: String, enableHashCache: Bool = true) throws {
+    /// Initialize with storage URL (uses default file system storage or config-based provider)
+    /// - Parameters:
+    ///   - storageURL: URL for storage directory (used if no custom provider configured)
+    ///   - hashAlgorithm: Hash algorithm to use
+    ///   - enableHashCache: Whether to enable hash caching
+    /// - Throws: Error if storage cannot be created
+    /// 
+    /// **Note**: If `SnugConfig` specifies a `storageProviderIdentifier`, that provider will be used
+    /// instead of file system storage. Otherwise, uses file system storage at `storageURL`.
+    /// 
+    /// **CLI Usage**: The `snug` CLI tool uses this initializer with local file system storage.
+    /// For cloud storage, use the `storageProvider` or `providerIdentifier` initializers instead.
+    public init(storageURL: URL, hashAlgorithm: String, enableHashCache: Bool = true) async throws {
         self.storageURL = storageURL
         self.hashAlgorithm = hashAlgorithm
         
@@ -29,23 +41,34 @@ public class SnugArchiver {
         let cacheURL = enableHashCache ? storageURL.appendingPathComponent(".hashcache.json") : nil
         self.hashCache = FileHashCache(cacheFileURL: cacheURL, hashAlgorithm: hashAlgorithm)
         
-        // Check if mirroring is enabled or glacier volumes exist in config
-        if let config = try? SnugConfigManager.load() {
-            let hasGlacierVolumes = config.storageLocations.contains { $0.volumeType == .glacier }
-            let hasMirrorVolumes = config.storageLocations.contains { $0.volumeType == .mirror || $0.volumeType == .secondary }
-            
-            if config.enableMirroring || hasGlacierVolumes || hasMirrorVolumes {
-                self.chunkStorage = try SnugStorage.createMirroredChunkStorage(from: config)
+        // Check configuration for custom storage provider
+        if let config = try? SnugConfigManager.load(),
+           let providerID = config.storageProviderIdentifier {
+            // Use custom storage provider from config
+            let providerConfig = config.storageProviderConfiguration?.mapValues { $0 as Any }
+            self.chunkStorage = try await SnugStorage.createChunkStorage(
+                providerIdentifier: providerID,
+                configuration: providerConfig
+            )
+        } else {
+            // Check if mirroring is enabled or glacier volumes exist in config
+            if let config = try? SnugConfigManager.load() {
+                let hasGlacierVolumes = config.storageLocations.contains { $0.volumeType == .glacier }
+                let hasMirrorVolumes = config.storageLocations.contains { $0.volumeType == .mirror || $0.volumeType == .secondary }
+                
+                if config.enableMirroring || hasGlacierVolumes || hasMirrorVolumes {
+                    self.chunkStorage = try SnugStorage.createMirroredChunkStorage(from: config)
+                } else {
+                    self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
+                }
             } else {
                 self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
             }
-        } else {
-            self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
         }
     }
     
     /// Initialize with explicit chunk storage (for testing or custom storage)
-    public init(chunkStorage: ChunkStorage, hashAlgorithm: String, enableHashCache: Bool = true) {
+    public init(chunkStorage: any ChunkStorage, hashAlgorithm: String, enableHashCache: Bool = true) {
         self.storageURL = URL(fileURLWithPath: "/")
         self.hashAlgorithm = hashAlgorithm
         self.chunkStorage = chunkStorage
@@ -136,7 +159,7 @@ public class SnugArchiver {
         let encoder = YAMLEncoder()
         let yamlString = try encoder.encode(archive)
         guard let yamlData = yamlString.data(using: .utf8) else {
-            throw SnugError.storageError("Failed to encode YAML")
+            throw SnugError.storageError("Failed to encode YAML", nil)
         }
         
         // 4. Create archive with embedded files section
@@ -153,7 +176,7 @@ public class SnugArchiver {
             archiveData.append(Data(bytes: &fileCount, count: 4))
             
             // Write each embedded file
-            for (hash, data, path) in embeddedFiles {
+            for (hash, data, _) in embeddedFiles {
                 let fileOffset = Int64(archiveData.count)
                 embeddedOffsets[hash] = fileOffset
                 
@@ -205,7 +228,7 @@ public class SnugArchiver {
             
             let updatedYamlString = try encoder.encode(updatedArchive)
             guard let updatedYamlData = updatedYamlString.data(using: .utf8) else {
-                throw SnugError.storageError("Failed to encode updated YAML")
+                throw SnugError.storageError("Failed to encode updated YAML", nil)
             }
             
             // Rebuild archive data with updated YAML
@@ -367,7 +390,7 @@ public class SnugArchiver {
         )
         
         guard let enumerator = enumerator else {
-            throw SnugError.storageError("Failed to enumerate directory")
+            throw SnugError.storageError("Failed to enumerate directory", nil)
         }
         
         var filesProcessed = 0
@@ -506,12 +529,15 @@ public class SnugArchiver {
                         let createdDate = try? resolvedURL.resourceValues(forKeys: [.creationDateKey]).creationDate
                         let modifiedDate = try? resolvedURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                         
+                        // Detect if this is a disk image file
+                        let (chunkType, contentType) = detectChunkType(for: resolvedURL, data: fileData)
+                        
                         let metadata = ChunkMetadata(
                             size: fileData.count,
                             contentHash: hash,
                             hashAlgorithm: hashAlgorithm,
-                            contentType: nil,
-                            chunkType: "file",
+                            contentType: contentType,
+                            chunkType: chunkType,
                             originalFilename: resolvedURL.lastPathComponent,
                             originalPaths: [relativePath],
                             created: createdDate,
@@ -594,12 +620,21 @@ public class SnugArchiver {
             }
             
             // Handle special files (devices, sockets, FIFOs)
+            // Note: These are currently always false as URLResourceValues doesn't provide these properties
+            // This code is kept for future implementation when we add stat() support
             if isBlockDevice || isCharacterDevice || isSocket || isFIFO {
                 if embedSystemFiles {
                     // Store special file metadata entry
-                    let specialType = isBlockDevice ? "block-device" :
-                                    isCharacterDevice ? "character-device" :
-                                    isSocket ? "socket" : "fifo"
+                    let specialType: String
+                    if isBlockDevice {
+                        specialType = "block-device"
+                    } else if isCharacterDevice {
+                        specialType = "character-device"
+                    } else if isSocket {
+                        specialType = "socket"
+                    } else {
+                        specialType = "fifo"
+                    }
                     
                     let entry = ArchiveEntry(
                         type: specialType,
@@ -623,9 +658,16 @@ public class SnugArchiver {
                 } else {
                     // Skip special files with warning
                     if verbose {
-                        let fileType = isBlockDevice ? "block device" :
-                                       isCharacterDevice ? "character device" :
-                                       isSocket ? "socket" : "FIFO"
+                        let fileType: String
+                        if isBlockDevice {
+                            fileType = "block device"
+                        } else if isCharacterDevice {
+                            fileType = "character device"
+                        } else if isSocket {
+                            fileType = "socket"
+                        } else {
+                            fileType = "FIFO"
+                        }
                         print("  Warning: Skipping \(fileType): \(relativePath)")
                     }
                 }
@@ -706,12 +748,15 @@ public class SnugArchiver {
                 let createdDate = try? fileURL.resourceValues(forKeys: [.creationDateKey]).creationDate
                 let modifiedDate = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                 
+                // Detect if this is a disk image file
+                let (chunkType, contentType) = detectChunkType(for: fileURL, data: fileData)
+                
                 let metadata = ChunkMetadata(
                     size: fileData.count,
                     contentHash: hash,
                     hashAlgorithm: hashAlgorithm,
-                    contentType: nil,
-                    chunkType: "file",
+                    contentType: contentType,
+                    chunkType: chunkType,
                     originalFilename: fileURL.lastPathComponent,
                     originalPaths: [relativePath],
                     created: createdDate,
@@ -895,12 +940,12 @@ public class SnugArchiver {
         }
         
         guard compressedSize > 0 else {
-            throw SnugError.compressionFailed("Compression returned zero size")
+            throw SnugError.compressionFailed("Compression returned zero size", nil)
         }
         
         return Data(bytes: destinationBuffer, count: compressedSize)
         #else
-        throw SnugError.compressionFailed("Compression not available on this platform")
+        throw SnugError.compressionFailed("Compression not available on this platform", nil)
         #endif
     }
 }
@@ -939,20 +984,102 @@ extension Data {
     }
     
     func md5() -> [UInt8] {
-        #if canImport(CommonCrypto)
-        var hash = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        self.withUnsafeBytes { bytes in
-            _ = CC_MD5(bytes.baseAddress, CC_LONG(self.count), &hash)
-        }
-        return hash
-        #elseif canImport(CryptoKit)
+        #if canImport(CryptoKit)
+        // Use CryptoKit's Insecure.MD5 - explicitly marked as insecure for legacy compatibility
+        // This is Apple's recommended way to use MD5 (read-only validation, companion files)
         let hash = Insecure.MD5.hash(data: self)
         return Array(hash)
+        #elseif canImport(CommonCrypto)
+        // Fallback: Use CommonCrypto (deprecated but kept for legacy compatibility)
+        // MD5 is intentionally kept for legacy compatibility (companion files, existing checksums)
+        // See HASH_ALGORITHM_POLICY.md for details
+        // Note: CC_MD5 deprecation warning is intentional - MD5 is read-only legacy support
+        var hash = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
+        self.withUnsafeBytes { bytes in
+            hash.withUnsafeMutableBytes { hashBytes in
+                // Using deprecated CC_MD5 intentionally for legacy compatibility
+                _ = CC_MD5(bytes.baseAddress, CC_LONG(self.count), hashBytes.baseAddress)
+            }
+        }
+        return hash
         #else
         return []
         #endif
     }
 }
+
+// MARK: - SnugArchiver Chunk Type Detection Extension
+
+extension SnugArchiver {
+    /// Detect chunk type and content type for a file
+    /// Uses the same detection logic as DiskImageAdapter implementations
+    /// - Parameters:
+    ///   - url: File URL
+    ///   - data: File data (may be partial for detection)
+    /// - Returns: Tuple of (chunkType, contentType)
+    func detectChunkType(for url: URL, data: Data) -> (chunkType: String, contentType: String?) {
+        let fileExtension = url.pathExtension.lowercased()
+        
+        // Check for disk image formats using file extension and magic numbers
+        // This matches the detection logic used by DiskImageAdapter implementations
+        
+        // DMG (Mac disk image)
+        if fileExtension == "dmg" {
+            // Check for UDIF signature at end of file
+            if data.count >= 512 {
+                let trailerData = data.subdata(in: (data.count - 512)..<data.count)
+                if trailerData[0..<4] == Data([0x6B, 0x6F, 0x6C, 0x79]) { // "koly" UDIF signature
+                    return ("disk-image", "application/x-apple-diskimage")
+                }
+            }
+        }
+        
+        // ISO 9660 (CD-ROM/DVD-ROM)
+        if fileExtension == "iso" || fileExtension == "img" {
+            if data.count >= 32769 { // ISO 9660 volume descriptor starts at sector 16 (32768 bytes)
+                let vdsStart = 32768
+                if data.count >= vdsStart + 1 && data[vdsStart] == 0x01 {
+                    // Primary Volume Descriptor
+                    return ("disk-image", "application/x-iso9660-image")
+                }
+            }
+            // Check for ISO 9660 signature at offset 32769
+            if data.count >= 32773 {
+                let signature = String(data: data.subdata(in: 32769..<32773), encoding: .isoLatin1) ?? ""
+                if signature == "CD001" {
+                    return ("disk-image", "application/x-iso9660-image")
+                }
+            }
+        }
+        
+        // VHD (Virtual Hard Disk)
+        if fileExtension == "vhd" {
+            if data.count >= 512 {
+                let footer = data.subdata(in: (data.count - 512)..<data.count)
+                if footer.count >= 8 {
+                    let signature = String(data: footer[0..<8], encoding: .ascii) ?? ""
+                    if signature == "conectix" {
+                        return ("disk-image", "application/x-vhd")
+                    }
+                }
+            }
+        }
+        
+        // Raw disk image (IMG) - check if size suggests a disk image
+        if fileExtension == "img" {
+            let size = data.count
+            if size > 0 && (size % 512 == 0 || size == 1440 * 1024 || size == 2880 * 1024) {
+                // Could be a raw disk image
+                return ("disk-image", "application/octet-stream")
+            }
+        }
+        
+        // Default to regular file
+        return ("file", nil)
+    }
+}
+
+// MARK: - Helper Classes
 
 // Helper class for thread-safe error storage
 private final class ErrorHolder: @unchecked Sendable {

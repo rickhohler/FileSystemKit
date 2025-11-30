@@ -27,10 +27,38 @@ public struct SnugStorage {
         }
     }
     
-    /// Create ChunkStorage instance for SNUG
+    /// Create ChunkStorage instance for SNUG (file system-based)
+    /// This is the default implementation for unit tests and local storage
     public static func createChunkStorage(at url: URL) throws -> SnugFileSystemChunkStorage {
         try ensureStorageDirectory(at: url)
         return SnugFileSystemChunkStorage(baseURL: url)
+    }
+    
+    /// Create ChunkStorage instance using a registered provider
+    /// - Parameters:
+    ///   - providerIdentifier: Storage provider identifier (defaults to "filesystem")
+    ///   - configuration: Optional configuration dictionary for the provider
+    /// - Returns: Configured ChunkStorage instance
+    /// - Throws: Error if provider not found or creation fails
+    public static func createChunkStorage(
+        providerIdentifier: String = "filesystem",
+        configuration: [String: Any]? = nil
+    ) async throws -> any ChunkStorage {
+        return try await ChunkStorageProviderRegistry.shared.createStorage(
+            identifier: providerIdentifier,
+            configuration: configuration
+        )
+    }
+    
+    /// Create ChunkStorage instance from a custom provider
+    /// - Parameter provider: Custom storage provider
+    /// - Returns: Configured ChunkStorage instance
+    /// - Throws: Error if creation fails
+    public static func createChunkStorage(
+        from provider: any ChunkStorageProvider,
+        configuration: [String: Any]? = nil
+    ) async throws -> any ChunkStorage {
+        return try await provider.createChunkStorage(configuration: configuration)
     }
 }
 
@@ -223,12 +251,12 @@ private final class SnugFileSystemChunkHandle: ChunkHandle, @unchecked Sendable 
     
     func read(range: Range<Int>) async throws -> Data {
         guard !isClosed, let handle = fileHandle else {
-            throw FileSystemError.storageUnavailable
+            throw FileSystemError.storageUnavailable(reason: "File handle is closed or unavailable")
         }
         
         handle.seek(toFileOffset: UInt64(range.lowerBound))
         guard let data = try handle.read(upToCount: range.upperBound - range.lowerBound) else {
-            throw FileSystemError.readFailed
+            throw FileSystemError.readFailed(path: url.path, underlyingError: nil)
         }
         return data
     }

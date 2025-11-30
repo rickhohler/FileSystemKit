@@ -1,20 +1,20 @@
-# SNUG Archive Format - Compressed YAML with Anchors/Aliases
+# Snug Archive Format - Compressed YAML with Anchors/Aliases
 
 ## Overview
 
-**SNUG File Format:**
+**Snug File Format:**
 - **Extension**: `.snug`
 - **Structure**: Compressed YAML document (gzip/deflate compression)
 - **Content**: YAML archive structure with anchors/aliases for deduplication
 
-YAML format with anchors (`&anchor`) and aliases (`*alias`) allows defining file references and directory structures once and reusing them throughout the archive. This is perfect for SNUG archives where:
+YAML format with anchors (`&anchor`) and aliases (`*alias`) allows defining file references and directory structures once and reusing them throughout the archive. This is perfect for Snug archives where:
 - Multiple entries may reference the same file hash (deduplication)
 - Directory metadata can be shared
 - Common metadata (owner, group, permissions) can be reused
 
 **Compression Benefits:**
 - YAML files can be verbose, especially with deep nesting
-- Compressing the YAML makes SNUG archives even smaller
+- Compressing the YAML makes Snug archives even smaller
 - Aligns with "Small" in "Small, Network-optimized, Unified Grouping"
 - Transparent to users - `SnugCompressionAdapter` handles decompression
 
@@ -36,9 +36,9 @@ file1:
   hash: "abc123..."
 ```
 
-## SNUG Format with YAML
+## Snug Format with YAML
 
-### Example: SNUG Archive with Reusable References
+### Example: Snug Archive with Reusable References
 
 ```yaml
 format: snug
@@ -299,7 +299,7 @@ entries:
 ## Recommended: YAML Format
 
 **Rationale:**
-1. **Deduplication is core to SNUG**: YAML anchors/aliases enable true deduplication
+1. **Deduplication is core to Snug**: YAML anchors/aliases enable true deduplication
 2. **Readability**: Easier to read and understand archive structure
 3. **Comments**: Can document why certain files share hashes
 4. **Swift support**: `Yams` library provides excellent YAML support
@@ -321,7 +321,7 @@ Files and directories (via ChunkStorage hash resolution)
 
 ### Compression
 
-SNUG files use **gzip/deflate compression**:
+Snug files use **gzip/deflate compression**:
 - Standard compression algorithm (widely supported)
 - Good compression ratio for text/YAML
 - Fast decompression
@@ -333,7 +333,7 @@ Use `Yams` (Swift YAML library):
 ```swift
 import Yams
 
-// Decompress SNUG file first
+// Decompress Snug file first
 let compressedData = try Data(contentsOf: snugURL)
 let decompressedData = try decompressGzip(data: compressedData)
 
@@ -350,7 +350,7 @@ let compressedData = try compressGzip(data: yamlData)
 try compressedData.write(to: snugURL)
 ```
 
-### SNUG Archive Structure
+### Snug Archive Structure
 
 ```swift
 public struct SnugArchive: Codable {
@@ -532,7 +532,7 @@ structure:
 - ✅ Natural deduplication support
 - ✅ No depth limitations
 
-## Example: Real-World SNUG Archive with Deep Nesting
+## Example: Real-World Snug Archive with Deep Nesting
 
 ```yaml
 format: snug
@@ -622,7 +622,7 @@ entries:
     <<: *defaults
 ```
 
-## Benefits for SNUG
+## Benefits for Snug
 
 1. **True Deduplication**: Same hash defined once, referenced many times
 2. **Smaller Archives**: No repetition of hash definitions
@@ -632,9 +632,9 @@ entries:
 
 ## Conclusion
 
-**Compressed YAML with anchors/aliases is the recommended format for SNUG** because:
-- ✅ **Compression**: Makes archives even smaller (aligns with "Small" in SNUG)
-- ✅ **Deduplication**: Enables true deduplication (core SNUG feature)
+**Compressed YAML with anchors/aliases is the recommended format for Snug** because:
+- ✅ **Compression**: Makes archives even smaller (aligns with "Small" in Snug)
+- ✅ **Deduplication**: Enables true deduplication (core Snug feature)
 - ✅ **Compact**: More compact than JSON (with deduplication + compression)
 - ✅ **Human-readable**: When decompressed, easy to read and maintain
 - ✅ **Comments**: Supports comments for documentation
@@ -647,5 +647,5 @@ entries:
 - Structure: YAML with anchors/aliases for deduplication
 - Processing: Decompress → Parse YAML → Resolve hashes → Extract files
 
-The format naturally supports the SNUG use case where the same file content (hash) appears in multiple locations in the directory structure, and compression makes the archives even smaller for network transfer.
+The format naturally supports the Snug use case where the same file content (hash) appears in multiple locations in the directory structure, and compression makes the archives even smaller for network transfer.
 

@@ -131,13 +131,13 @@ final class MockChunkHandle: ChunkHandle, @unchecked Sendable {
     
     func read(range: Range<Int>) async throws -> Data {
         guard !isClosed else {
-            throw FileSystemError.storageUnavailable
+            throw FileSystemError.storageUnavailable(reason: "Mock storage is closed")
         }
         
         guard range.lowerBound >= 0,
               range.upperBound <= data.count,
               range.lowerBound < range.upperBound else {
-            throw FileSystemError.invalidOffset
+            throw FileSystemError.invalidOffset(offset: range.lowerBound, maxOffset: data.count)
         }
         
         return data.subdata(in: range)

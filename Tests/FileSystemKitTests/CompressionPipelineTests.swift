@@ -260,8 +260,8 @@ final class CompressionPipelineTests: XCTestCase {
         CompressionAdapterRegistry.shared.register(GzipCompressionAdapter.self)
         CompressionAdapterRegistry.shared.register(TarCompressionAdapter.self)
         
-        // Get test gzipped tar file
-        guard let tarGzURL = getTestResource("Compressed/test.tar.gz") else {
+        // Verify test resource exists (test is skipped if not available)
+        guard getTestResource("Compressed/test.tar.gz") != nil else {
             throw XCTSkip("test.tar.gz not found in test resources")
         }
         

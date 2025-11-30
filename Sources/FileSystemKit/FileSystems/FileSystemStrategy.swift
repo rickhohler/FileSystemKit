@@ -159,7 +159,7 @@ extension FileSystemStrategy {
     public func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data {
         // Read chunk data
         guard let data = try await chunkStorage.readChunk(identifier) else {
-            throw FileSystemError.fileNotFound
+            throw FileSystemError.fileNotFound(path: "chunk:\(identifier.id)")
         }
         
         // For now, return the full chunk data
@@ -292,19 +292,19 @@ public class FileSystemStrategyFactory {
 
 extension FileSystemError {
     /// File system format not supported
-    public static let unsupportedFormat = FileSystemError.invalidFileSystem
+    public static let unsupportedFormat = FileSystemError.invalidFileSystem(reason: nil)
     
     /// File system format not detected
-    public static let formatNotDetected = FileSystemError.invalidFileSystem
+    public static let formatNotDetected = FileSystemError.invalidFileSystem(reason: nil)
     
     /// Get error for unsupported format
     public static func unsupportedFormatError() -> FileSystemError {
-        return .invalidFileSystem
+        return .invalidFileSystem(reason: nil)
     }
     
     /// Get error for format not detected
     public static func formatNotDetectedError() -> FileSystemError {
-        return .invalidFileSystem
+        return .invalidFileSystem(reason: nil)
     }
 }
 

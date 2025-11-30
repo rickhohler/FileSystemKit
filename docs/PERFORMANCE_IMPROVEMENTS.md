@@ -2,7 +2,7 @@
 
 ## Summary
 
-I've reviewed the snug tool implementation and identified several performance bottlenecks. The current implementation processes files sequentially, which is inefficient for high-volume operations. I've created a foundation for concurrent processing improvements.
+I've reviewed the Snug tool implementation and identified several performance bottlenecks. The current implementation processes files sequentially, which is inefficient for high-volume operations. I've created a foundation for concurrent processing improvements.
 
 ## Current Implementation Issues
 

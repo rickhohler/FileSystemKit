@@ -39,19 +39,48 @@ internal struct FileHashCacheEntry: Codable, Sendable {
 }
 
 /// Thread-safe file hash cache
+/// Optimized for millions of files with scalable cache size and O(1) LRU operations
 public actor FileHashCache {
     private var cache: [String: FileHashCacheEntry] = [:]
     private let cacheFileURL: URL?
     private let hashAlgorithm: String
     private let maxCacheSize: Int
-    private var accessOrder: [String] = [] // For LRU eviction
+    // Optimized LRU: Use linked list for O(1) operations instead of array O(n)
+    private var lruHead: LRUNode?
+    private var lruTail: LRUNode?
+    private var nodeMap: [String: LRUNode] = [:]
+    
+    /// Cache statistics
+    public struct CacheStats: Sendable {
+        var hits: Int64 = 0
+        var misses: Int64 = 0
+        var evictions: Int64 = 0
+        
+        var hitRate: Double {
+            let total = hits + misses
+            return total > 0 ? Double(hits) / Double(total) : 0.0
+        }
+    }
+    
+    private var cacheStats = CacheStats()
+    
+    /// LRU node for O(1) cache operations
+    private final class LRUNode: @unchecked Sendable {
+        let key: String
+        var prev: LRUNode?
+        var next: LRUNode?
+        
+        init(key: String) {
+            self.key = key
+        }
+    }
     
     /// Initialize cache
     /// - Parameters:
     ///   - cacheFileURL: Optional URL to persist cache to disk. If nil, cache is in-memory only.
     ///   - hashAlgorithm: Hash algorithm being used (sha256, sha1, md5)
-    ///   - maxCacheSize: Maximum number of entries to keep in memory (default: 10000)
-    public init(cacheFileURL: URL? = nil, hashAlgorithm: String, maxCacheSize: Int = 10000) {
+    ///   - maxCacheSize: Maximum number of entries to keep in memory (default: 1,000,000 for millions of files)
+    public init(cacheFileURL: URL? = nil, hashAlgorithm: String, maxCacheSize: Int = 1_000_000) {
         self.cacheFileURL = cacheFileURL
         self.hashAlgorithm = hashAlgorithm
         self.maxCacheSize = maxCacheSize
@@ -69,20 +98,21 @@ public actor FileHashCache {
         let key = cacheKey(for: url)
         
         guard let entry = cache[key] else {
+            cacheStats.misses += 1
             return nil
         }
         
         // Validate cache entry
         guard entry.isValid(for: url, hashAlgorithm: hashAlgorithm) else {
             cache.removeValue(forKey: key)
-            accessOrder.removeAll { $0 == key }
+            removeFromLRU(key)
+            cacheStats.misses += 1
             return nil
         }
         
-        // Update access order for LRU
-        accessOrder.removeAll { $0 == key }
-        accessOrder.append(key)
-        
+        // Update LRU (O(1) operation using linked list)
+        touch(key)
+        cacheStats.hits += 1
         return entry.hash
     }
     
@@ -100,20 +130,16 @@ public actor FileHashCache {
         
         // Remove old entry if exists
         if cache[key] != nil {
-            accessOrder.removeAll { $0 == key }
+            removeFromLRU(key)
         }
         
         cache[key] = entry
-        accessOrder.append(key)
+        addToLRUHead(key)
         
-        // Evict oldest entries if over limit
+        // Evict oldest entries if over limit (O(1) per eviction)
         while cache.count > maxCacheSize {
-            if let oldestKey = accessOrder.first {
-                cache.removeValue(forKey: oldestKey)
-                accessOrder.removeFirst()
-            } else {
-                break
-            }
+            evictLRU()
+            cacheStats.evictions += 1
         }
     }
     
@@ -121,13 +147,16 @@ public actor FileHashCache {
     public func removeHash(for url: URL) {
         let key = cacheKey(for: url)
         cache.removeValue(forKey: key)
-        accessOrder.removeAll { $0 == key }
+        removeFromLRU(key)
     }
     
     /// Clear all cache entries
     public func clear() {
         cache.removeAll()
-        accessOrder.removeAll()
+        lruHead = nil
+        lruTail = nil
+        nodeMap.removeAll()
+        cacheStats = CacheStats()
     }
     
     /// Get cache statistics
@@ -163,35 +192,92 @@ public actor FileHashCache {
             
             let loadedCache = try decoder.decode([String: FileHashCacheEntry].self, from: cacheData)
             
-            // Filter out invalid entries (wrong algorithm, old files)
+            // Filter out invalid entries (wrong algorithm)
             var validCache: [String: FileHashCacheEntry] = [:]
-            var validOrder: [String] = []
             
             for (key, entry) in loadedCache {
-                // Only keep entries with matching hash algorithm
                 if entry.hashAlgorithm == hashAlgorithm {
                     validCache[key] = entry
-                    validOrder.append(key)
                 }
             }
             
             cache = validCache
-            accessOrder = validOrder
+            
+            // Rebuild LRU structure (order by cacheTime)
+            let sortedEntries = validCache.sorted { $0.value.cacheTime < $1.value.cacheTime }
+            for (key, _) in sortedEntries {
+                addToLRUHead(key)
+            }
             
             // Trim to max size if needed
             while cache.count > maxCacheSize {
-                if let oldestKey = accessOrder.first {
-                    cache.removeValue(forKey: oldestKey)
-                    accessOrder.removeFirst()
-                } else {
-                    break
-                }
+                evictLRU()
             }
         } catch {
             // If cache file is corrupted, start fresh
             cache.removeAll()
-            accessOrder.removeAll()
+            lruHead = nil
+            lruTail = nil
+            nodeMap.removeAll()
         }
+    }
+    
+    // MARK: - LRU Operations (O(1))
+    
+    /// Touch a key (move to head of LRU)
+    private func touch(_ key: String) {
+        if nodeMap[key] != nil {
+            removeFromLRU(key)
+            addToLRUHead(key)
+        } else {
+            addToLRUHead(key)
+        }
+    }
+    
+    /// Add key to head of LRU list
+    private func addToLRUHead(_ key: String) {
+        let node = LRUNode(key: key)
+        nodeMap[key] = node
+        
+        if let head = lruHead {
+            node.next = head
+            head.prev = node
+            lruHead = node
+        } else {
+            lruHead = node
+            lruTail = node
+        }
+    }
+    
+    /// Remove key from LRU list
+    private func removeFromLRU(_ key: String) {
+        guard let node = nodeMap[key] else {
+            return
+        }
+        
+        if let prev = node.prev {
+            prev.next = node.next
+        } else {
+            lruHead = node.next
+        }
+        
+        if let next = node.next {
+            next.prev = node.prev
+        } else {
+            lruTail = node.prev
+        }
+        
+        nodeMap.removeValue(forKey: key)
+    }
+    
+    /// Evict least recently used entry
+    private func evictLRU() {
+        guard let tail = lruTail else {
+            return
+        }
+        
+        cache.removeValue(forKey: tail.key)
+        removeFromLRU(tail.key)
     }
     
     /// Generate cache key for a file URL

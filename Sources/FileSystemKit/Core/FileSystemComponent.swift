@@ -307,16 +307,30 @@ public class File: FileSystemComponent {
             }
             return FileHash(algorithm: .sha1, value: Data(digest))
         case .md5:
+            #if canImport(CryptoKit)
+            // Use CryptoKit's Insecure.MD5 - explicitly marked as insecure for legacy compatibility
+            let digest = Insecure.MD5.hash(data: data)
+            return FileHash(algorithm: .md5, value: Data(digest))
+            #elseif canImport(CommonCrypto)
+            // Fallback: Use CommonCrypto (deprecated but kept for legacy compatibility)
+            // MD5 is intentionally kept for legacy compatibility (companion files, existing checksums)
+            // Note: CC_MD5 deprecation warning is intentional - MD5 is read-only legacy support
             var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
             data.withUnsafeBytes { bytes in
-                _ = CC_MD5(bytes.baseAddress, CC_LONG(data.count), &digest)
+                digest.withUnsafeMutableBytes { digestBytes in
+                    // Using deprecated CC_MD5 intentionally for legacy compatibility
+                    _ = CC_MD5(bytes.baseAddress, CC_LONG(data.count), digestBytes.baseAddress)
+                }
             }
             return FileHash(algorithm: .md5, value: Data(digest))
+            #else
+            throw FileSystemError.hashNotImplemented(algorithm: .md5)
+            #endif
         case .crc32:
             return FileHash(algorithm: .crc32, value: computeCRC32(data: data))
         }
         #else
-        throw FileSystemError.hashNotImplemented
+        throw FileSystemError.hashNotImplemented(algorithm: nil)
         #endif
     }
     

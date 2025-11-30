@@ -306,7 +306,15 @@ final class RawDiskDataTests: XCTestCase {
         let diskData = RawDiskData(rawData: rawData)
         
         XCTAssertThrowsError(try diskData.readData(at: 10, length: 5)) { error in
-            XCTAssertEqual(error as? FileSystemError, .invalidOffset)
+            if let fsError = error as? FileSystemError {
+                if case .invalidOffset = fsError {
+                    // Expected error case
+                } else {
+                    XCTFail("Expected invalidOffset error, got \(fsError)")
+                }
+            } else {
+                XCTFail("Expected FileSystemError, got \(error)")
+            }
         }
     }
     

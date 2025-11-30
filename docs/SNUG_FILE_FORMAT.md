@@ -1,13 +1,13 @@
-# SNUG File Format Specification
+# Snug File Format Specification
 
 ## Overview
 
-**SNUG** (Small, Network-optimized, Unified Grouping) is a content-addressable archive format that stores directory structures and file metadata but references file content by hash instead of embedding it.
+**Snug** (Small, Network-optimized, Unified Grouping) is a content-addressable archive format that stores directory structures and file metadata but references file content by hash instead of embedding it.
 
 ## File Format
 
 ### Extension
-- **`.snug`** - Standard extension for SNUG archives
+- **`.snug`** - Standard extension for Snug archives
 
 ### Structure
 ```
@@ -22,11 +22,11 @@ archive.snug
 
 ### Compression
 
-SNUG files are **compressed YAML documents**:
+Snug files are **compressed YAML documents**:
 - **Algorithm**: gzip/deflate (standard compression)
 - **Rationale**: 
   - YAML files can be verbose, especially with deep nesting
-  - Compression makes SNUG archives even smaller
+  - Compression makes Snug archives even smaller
   - Aligns with "Small" in "Small, Network-optimized, Unified Grouping"
   - Transparent to users via `CompressionAdapter` protocol
 
@@ -281,7 +281,7 @@ for entry in archive.entries {
 **Traditional ZIP:**
 - Size: ~100MB (compressed file data)
 
-**SNUG Archive:**
+**Snug Archive:**
 - YAML metadata: ~50KB (uncompressed)
 - Compressed YAML: ~10KB (gzip)
 - **Total: ~10KB** (99.99% smaller!)
@@ -294,12 +294,12 @@ for entry in archive.entries {
 
 ## Conclusion
 
-**SNUG file format:**
+**Snug file format:**
 - ✅ **Extension**: `.snug`
 - ✅ **Structure**: Compressed YAML document (gzip/deflate)
 - ✅ **Content**: YAML with anchors/aliases for deduplication
 - ✅ **Processing**: Decompress → Parse YAML → Resolve hashes → Extract files
 - ✅ **Benefits**: Small, network-optimized, unified grouping
 
-The compressed YAML format makes SNUG archives extremely small while maintaining human-readability and supporting powerful deduplication through YAML anchors/aliases.
+The compressed YAML format makes Snug archives extremely small while maintaining human-readability and supporting powerful deduplication through YAML anchors/aliases.
 

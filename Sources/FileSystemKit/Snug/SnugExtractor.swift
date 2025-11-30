@@ -6,28 +6,75 @@ import Foundation
 /// Extracts files from SNUG archives
 public class SnugExtractor {
     let storageURL: URL
-    let chunkStorage: ChunkStorage
+    let chunkStorage: any ChunkStorage
     
-    public init(storageURL: URL) throws {
+    /// Initialize with storage URL (uses default file system storage or config-based provider)
+    /// - Parameter storageURL: URL for storage directory (used if no custom provider configured)
+    /// - Throws: Error if storage cannot be created
+    /// 
+    /// **Note**: If `SnugConfig` specifies a `storageProviderIdentifier`, that provider will be used
+    /// instead of file system storage. Otherwise, uses file system storage at `storageURL`.
+    public init(storageURL: URL) async throws {
         self.storageURL = storageURL
         
-        // Check if mirroring is enabled or glacier volumes exist in config
-        if let config = try? SnugConfigManager.load() {
-            let hasGlacierVolumes = config.storageLocations.contains { $0.volumeType == .glacier }
-            let hasMirrorVolumes = config.storageLocations.contains { $0.volumeType == .mirror || $0.volumeType == .secondary }
-            
-            if config.enableMirroring || hasGlacierVolumes || hasMirrorVolumes {
-                self.chunkStorage = try SnugStorage.createMirroredChunkStorage(from: config)
+        // Check configuration for custom storage provider
+        if let config = try? SnugConfigManager.load(),
+           let providerID = config.storageProviderIdentifier {
+            // Use custom storage provider from config
+            let providerConfig = config.storageProviderConfiguration?.mapValues { $0 as Any }
+            self.chunkStorage = try await SnugStorage.createChunkStorage(
+                providerIdentifier: providerID,
+                configuration: providerConfig
+            )
+        } else {
+            // Check if mirroring is enabled or glacier volumes exist in config
+            if let config = try? SnugConfigManager.load() {
+                let hasGlacierVolumes = config.storageLocations.contains { $0.volumeType == .glacier }
+                let hasMirrorVolumes = config.storageLocations.contains { $0.volumeType == .mirror || $0.volumeType == .secondary }
+                
+                if config.enableMirroring || hasGlacierVolumes || hasMirrorVolumes {
+                    self.chunkStorage = try SnugStorage.createMirroredChunkStorage(from: config)
+                } else {
+                    self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
+                }
             } else {
                 self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
             }
-        } else {
-            self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
         }
     }
     
+    /// Initialize with custom storage provider
+    /// - Parameter storageProvider: Custom storage provider
+    /// - Parameter storageConfiguration: Optional configuration for the provider
+    /// - Throws: Error if storage cannot be created
+    public init(
+        storageProvider: any ChunkStorageProvider,
+        storageConfiguration: [String: Any]? = nil
+    ) async throws {
+        self.storageURL = URL(fileURLWithPath: "/")
+        self.chunkStorage = try await SnugStorage.createChunkStorage(
+            from: storageProvider,
+            configuration: storageConfiguration
+        )
+    }
+    
+    /// Initialize with registered storage provider by identifier
+    /// - Parameter providerIdentifier: Storage provider identifier
+    /// - Parameter storageConfiguration: Optional configuration dictionary
+    /// - Throws: Error if provider not found or storage cannot be created
+    public init(
+        providerIdentifier: String,
+        storageConfiguration: [String: Any]? = nil
+    ) async throws {
+        self.storageURL = URL(fileURLWithPath: "/")
+        self.chunkStorage = try await SnugStorage.createChunkStorage(
+            providerIdentifier: providerIdentifier,
+            configuration: storageConfiguration
+        )
+    }
+    
     /// Initialize with explicit chunk storage (for testing or custom storage)
-    public init(chunkStorage: ChunkStorage) {
+    public init(chunkStorage: any ChunkStorage) {
         self.storageURL = URL(fileURLWithPath: "/")
         self.chunkStorage = chunkStorage
     }
@@ -178,7 +225,7 @@ public class SnugExtractor {
         
         // Throw if all extractions failed
         if extractedCount == 0 && errorCount > 0 {
-            throw SnugError.storageError("Failed to extract all entries")
+            throw SnugError.storageError("Failed to extract all entries", nil)
         }
     }
 }

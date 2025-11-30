@@ -47,12 +47,12 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
               !sectors.isEmpty,
               let firstSector = sectors.first,
               firstSector.data.count >= ISO9660FileSystemStrategy.sectorSize * ISO9660FileSystemStrategy.volumeDescriptorSetStart + ISO9660FileSystemStrategy.sectorSize else {
-            throw FileSystemError.invalidFileSystem
+            throw FileSystemError.invalidFileSystem(reason: "Insufficient data for ISO9660 volume descriptor")
         }
         
         // Extract ISO data from sectors
         guard let sectors = diskData.sectors else {
-            throw FileSystemError.invalidFileSystem
+            throw FileSystemError.invalidFileSystem(reason: "No sector data available")
         }
         var isoData = Data()
         for sector in sectors {
@@ -109,7 +109,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     public func parse(diskData: RawDiskData) throws -> FileSystemFolder {
         // Extract ISO data from sectors
         guard let sectors = diskData.sectors else {
-            throw FileSystemError.invalidFileSystem
+            throw FileSystemError.invalidFileSystem(reason: nil)
         }
         var isoData = Data()
         for sector in sectors {
@@ -131,7 +131,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
         
         // Extract ISO data from sectors
         guard let sectors = diskData.sectors else {
-            throw FileSystemError.invalidFileSystem
+            throw FileSystemError.invalidFileSystem(reason: nil)
         }
         var isoData = Data()
         for sector in sectors {
@@ -143,7 +143,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
         let sectorOffset = location.offset % ISO9660FileSystemStrategy.sectorSize
         
         guard logicalSector * ISO9660FileSystemStrategy.sectorSize + location.length <= isoData.count else {
-            throw FileSystemError.invalidOffset
+            throw FileSystemError.invalidOffset(offset: nil, maxOffset: nil)
         }
         
         let startIndex = isoData.index(isoData.startIndex, offsetBy: logicalSector * ISO9660FileSystemStrategy.sectorSize + sectorOffset)
@@ -155,7 +155,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     /// Write file content to raw disk data
     public func writeFile(_ data: Data, as file: File, to diskData: inout RawDiskData) throws {
         // ISO 9660 is read-only (CD-ROM standard)
-        throw FileSystemError.unsupportedFileSystemFormat
+        throw FileSystemError.unsupportedFileSystemFormat(format: nil)
     }
     
     /// Register this strategy with the factory
@@ -167,7 +167,7 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     /// Create a new formatted ISO 9660 disk image
     public static func format(parameters: FormatParameters) throws -> RawDiskData {
         // TODO: Implement ISO 9660 formatting
-        throw FileSystemError.unsupportedFileSystemFormat
+        throw FileSystemError.unsupportedFileSystemFormat(format: nil)
     }
 }
 
@@ -235,13 +235,13 @@ private func parsePrimaryVolumeDescriptor(from data: Data) throws -> PrimaryVolu
         offset += ISO9660FileSystemStrategy.sectorSize
     }
     
-    throw FileSystemError.invalidFileSystem
+    throw FileSystemError.invalidFileSystem(reason: nil)
 }
 
 /// Parse volume descriptor at offset
 private func parseVolumeDescriptor(at offset: Int, from data: Data) throws -> PrimaryVolumeDescriptor {
     guard offset + ISO9660FileSystemStrategy.sectorSize <= data.count else {
-        throw FileSystemError.invalidFileSystem
+        throw FileSystemError.invalidFileSystem(reason: nil)
     }
     
     let sectorData = data.subdata(in: offset..<offset + ISO9660FileSystemStrategy.sectorSize)
@@ -320,7 +320,7 @@ private func parseRootDirectoryRecord(from data: Data, volumeDescriptor: Primary
 /// Parse directory record at offset
 private func parseDirectoryRecord(at offset: Int, from data: Data) throws -> DirectoryRecord {
     guard offset + 33 <= data.count else {
-        throw FileSystemError.invalidFileSystem
+        throw FileSystemError.invalidFileSystem(reason: nil)
     }
     
     var cursor = offset
@@ -328,12 +328,12 @@ private func parseDirectoryRecord(at offset: Int, from data: Data) throws -> Dir
     // Length of directory record
     let length = data[cursor]
     guard length > 0, length <= 255 else {
-        throw FileSystemError.invalidFileSystem
+        throw FileSystemError.invalidFileSystem(reason: nil)
     }
     cursor += 1
     
     guard offset + Int(length) <= data.count else {
-        throw FileSystemError.invalidFileSystem
+        throw FileSystemError.invalidFileSystem(reason: nil)
     }
     
     // Extended attribute length
@@ -450,7 +450,7 @@ private func parseDirectory(
     let directorySize = directoryRecord.dataLength
     
     guard directoryLocation + directorySize <= data.count else {
-        throw FileSystemError.invalidFileSystem
+        throw FileSystemError.invalidFileSystem(reason: nil)
     }
     
     let directoryData = data.subdata(in: directoryLocation..<directoryLocation + directorySize)

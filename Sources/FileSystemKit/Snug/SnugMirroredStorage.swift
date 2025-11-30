@@ -1,4 +1,4 @@
-// FileSystemKit - SNUG Mirrored Storage
+// FileSystemKit - Snug Mirrored Storage
 // Provides redundancy by mirroring chunks to multiple storage locations
 
 import Foundation
@@ -230,7 +230,7 @@ public extension SnugStorage {
         let available = try SnugConfigManager.getAvailableStorageLocations(from: config)
         
         guard let primary = available.first(where: { $0.volumeType == .primary }) ?? available.first else {
-            throw SnugError.storageError("No primary storage location available")
+            throw SnugError.storageError("No primary storage location available", nil)
         }
         
         let primaryStorage = try createChunkStorage(at: URL(fileURLWithPath: primary.path))

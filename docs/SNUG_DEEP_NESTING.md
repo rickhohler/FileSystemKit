@@ -1,14 +1,14 @@
-# SNUG Format - Deep Nested Directory Support
+# Snug Format - Deep Nested Directory Support
 
 ## Overview
 
-The SNUG YAML format **fully supports deep nested directory structures** with no practical depth limit. This document demonstrates how deep nesting works and best practices.
+The Snug YAML format **fully supports deep nested directory structures** with no practical depth limit. This document demonstrates how deep nesting works and best practices.
 
 ## How Deep Nesting Works
 
 ### Path-Based Entries (Recommended)
 
-SNUG uses **path strings** for entries, which naturally supports unlimited depth:
+Snug uses **path strings** for entries, which naturally supports unlimited depth:
 
 ```yaml
 entries:
@@ -359,7 +359,7 @@ entries:
 
 ## Conclusion
 
-**Yes, SNUG format fully supports deep nested directory structures!**
+**Yes, Snug format fully supports deep nested directory structures!**
 
 - ✅ **No depth limit** - path strings support arbitrary depth
 - ✅ **Automatic directory creation** - parent directories created automatically
