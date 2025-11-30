@@ -8,7 +8,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Future enhancements and features
+- **ROADMAP.md**: Comprehensive roadmap outlining future development plans
+  - Organized by priority levels (High/Medium/Low)
+  - Development milestones and phases
+  - Code quality standards (>90% coverage requirement)
+  - Versioning strategy and release cadence
+  - 32 issues documented across priority levels
+
+### Documentation
+- Added roadmap reference to README.md
 
 ## [1.2.1] - 2025-01-15
 
@@ -120,7 +128,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.0.0] - 2025-11-29
 
 ### Added
-- **SNUG Archive Implementation**: Complete content-addressable archive system
+- **Snug Archive Implementation**: Complete content-addressable archive system
   - `SnugArchive`, `HashDefinition`, `MetadataTemplate`, `ArchiveEntry` data models
   - `SnugArchiver` for creating archives from directories
   - `SnugExtractor` for extracting archives
