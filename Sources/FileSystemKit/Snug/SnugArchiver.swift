@@ -423,7 +423,7 @@ public class SnugArchiver {
             
             // Detect special files (block devices, character devices, sockets, FIFOs)
             // URLResourceValues doesn't provide these, so we use stat() system call
-            let specialFileInfo = detectSpecialFile(at: fileURL)
+            let specialFileInfo = detectSpecialFileType(at: fileURL)
             
             // Handle symlinks
             if isSymlink {
@@ -1066,85 +1066,6 @@ extension SnugArchiver {
     }
 }
 
-// MARK: - Special File Detection
-
-/// Information about special file types detected via stat()
-private struct SpecialFileInfo {
-    let isBlockDevice: Bool
-    let isCharacterDevice: Bool
-    let isSocket: Bool
-    let isFIFO: Bool
-    
-    /// Check if this is any type of special file
-    var isSpecialFile: Bool {
-        return isBlockDevice || isCharacterDevice || isSocket || isFIFO
-    }
-    
-    /// Get the special file type string for ArchiveEntry
-    var typeString: String? {
-        if isBlockDevice {
-            return "block-device"
-        } else if isCharacterDevice {
-            return "character-device"
-        } else if isSocket {
-            return "socket"
-        } else if isFIFO {
-            return "fifo"
-        }
-        return nil
-    }
-    
-    /// Get human-readable file type description
-    var description: String {
-        if isBlockDevice {
-            return "block device"
-        } else if isCharacterDevice {
-            return "character device"
-        } else if isSocket {
-            return "socket"
-        } else if isFIFO {
-            return "FIFO"
-        }
-        return "unknown special file"
-    }
-}
-
-/// Detect special file types using stat() system call
-/// - Parameter url: File URL to check
-/// - Returns: SpecialFileInfo with detected file types, or nil if not a special file or detection fails
-private func detectSpecialFile(at url: URL) -> SpecialFileInfo? {
-    let path = url.path
-    
-    // Use stat() to get file type information
-    var statInfo = stat()
-    guard stat(path, &statInfo) == 0 else {
-        // stat() failed - file might not exist or we don't have permission
-        // Return nil to indicate we couldn't determine special file status
-        return nil
-    }
-    
-    // Check file mode for special file types
-    // S_IFMT is the bit mask for file type bits
-    let fileMode = statInfo.st_mode & S_IFMT
-    
-    let isBlockDevice = fileMode == S_IFBLK
-    let isCharacterDevice = fileMode == S_IFCHR
-    let isSocket = fileMode == S_IFSOCK
-    let isFIFO = fileMode == S_IFIFO
-    
-    // Only return info if it's actually a special file
-    if isBlockDevice || isCharacterDevice || isSocket || isFIFO {
-        return SpecialFileInfo(
-            isBlockDevice: isBlockDevice,
-            isCharacterDevice: isCharacterDevice,
-            isSocket: isSocket,
-            isFIFO: isFIFO
-        )
-    }
-    
-    return nil
-}
-
 
 // MARK: - Helper Classes
 
@@ -1156,10 +1077,9 @@ private final class ErrorHolder: @unchecked Sendable {
 // Helper class for thread-safe processing result storage
 private final class ProcessingResultHolder: @unchecked Sendable {
     var entries: [ArchiveEntry] = []
-    var hashRegistry: [String: HashDefinition] = [:]
+    var hashRegistry: [String: HashDefinition] = []
     var processedHashes: Set<String> = []
     var totalSize: Int = 0
     var embeddedFiles: [(hash: String, data: Data, path: String)] = []
     var error: Error?
 }
-
