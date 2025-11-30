@@ -7,24 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.0.0] - 2025-11-30
+## [1.3.0] - 2025-11-30
 
 ### Changed
-- **BREAKING**: Renamed `File` → `FileSystemEntry` to avoid naming conflicts
+- Renamed `File` → `FileSystemEntry` to avoid naming conflicts
   - `File` class renamed to `FileSystemEntry` (represents files only)
   - `FileMetadata` struct renamed to `FileSystemEntryMetadata`
   - Added `chunkIdentifier` property to `FileSystemEntry` for chunk-based storage
   - Added `toChunk()` method to convert `FileSystemEntry` to `Chunk`
   - Made `FileLocation` optional in `FileSystemEntryMetadata` (not all entries have disk image location)
   - Updated `FileSystemStrategy` protocol to use `FileSystemEntry`
-  - Removed deprecated typealiases `File` and `FileMetadata` (breaking change)
+  - **Backward compatible**: Deprecated typealiases `File` and `FileMetadata` are still available
   - Clarified that `FileSystemEntry` represents files only; directories use `FileSystemFolder`
-- **BREAKING**: Updated `FileSystemError` enum cases to require parameters
-  - `invalidOffset` now requires `(offset: Int?, maxOffset: Int?)`
-  - `invalidFileSystem` now requires `(reason: String?)`
-  - `unsupportedFileSystemFormat` now requires `(format: String?)`
-  - `fileNotFound` now requires `(path: String?)`
-  - `storageUnavailable` now requires `(reason: String?)`
 
 ### Added
 - **Core Types**: New reusable core types for common file system operations
