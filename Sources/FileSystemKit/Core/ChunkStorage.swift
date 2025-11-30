@@ -40,6 +40,15 @@ public struct ChunkMetadata: Sendable, Codable, Equatable, Hashable {
     /// Original filename (if applicable)
     public let originalFilename: String?
     
+    /// Original file paths (multiple if same content appears in different locations)
+    public let originalPaths: [String]?
+    
+    /// Creation timestamp (when file was originally created)
+    public let created: Date?
+    
+    /// Modification timestamp (when file was last modified)
+    public let modified: Date?
+    
     /// Compression information (if applicable)
     public let compression: CompressionInfo?
     
@@ -50,6 +59,9 @@ public struct ChunkMetadata: Sendable, Codable, Equatable, Hashable {
         contentType: String? = nil,
         chunkType: String? = nil,
         originalFilename: String? = nil,
+        originalPaths: [String]? = nil,
+        created: Date? = nil,
+        modified: Date? = nil,
         compression: CompressionInfo? = nil
     ) {
         self.size = size
@@ -58,6 +70,9 @@ public struct ChunkMetadata: Sendable, Codable, Equatable, Hashable {
         self.contentType = contentType
         self.chunkType = chunkType
         self.originalFilename = originalFilename
+        self.originalPaths = originalPaths
+        self.created = created
+        self.modified = modified
         self.compression = compression
     }
 }

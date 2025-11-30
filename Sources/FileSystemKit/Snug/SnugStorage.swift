@@ -69,11 +69,79 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
         )
         
         // Write file (only if it doesn't exist - deduplication)
-        if !FileManager.default.fileExists(atPath: url.path) {
+        let isNewFile = !FileManager.default.fileExists(atPath: url.path)
+        if isNewFile {
             try data.write(to: url)
         }
         
+        // Write or update metadata file (always update to track all original paths)
+        if let metadata = metadata {
+            let metadataURL = url.appendingPathExtension("meta")
+            try writeMetadata(metadata, to: metadataURL, identifier: identifier, isNewFile: isNewFile)
+        }
+        
         return identifier
+    }
+    
+    /// Write metadata to file (JSON format)
+    private func writeMetadata(_ metadata: ChunkMetadata, to url: URL, identifier: ChunkIdentifier, isNewFile: Bool) throws {
+        // If file exists, read existing metadata to merge original paths
+        var finalMetadata = metadata
+        
+        if !isNewFile, let existingData = try? Data(contentsOf: url) {
+            if let existingMetadata = try? JSONDecoder().decode(ChunkMetadata.self, from: existingData) {
+                // Merge original paths
+                var mergedPaths = Set(existingMetadata.originalPaths ?? [])
+                if let originalFilename = existingMetadata.originalFilename {
+                    mergedPaths.insert(originalFilename)
+                }
+                if let paths = metadata.originalPaths {
+                    mergedPaths.formUnion(paths)
+                }
+                if let originalFilename = metadata.originalFilename {
+                    mergedPaths.insert(originalFilename)
+                }
+                
+                // Use earliest created date, latest modified date
+                let earliestCreated = [existingMetadata.created, metadata.created].compactMap { $0 }.min()
+                let latestModified = [existingMetadata.modified, metadata.modified].compactMap { $0 }.max()
+                
+                finalMetadata = ChunkMetadata(
+                    size: metadata.size,
+                    contentHash: metadata.contentHash ?? existingMetadata.contentHash,
+                    hashAlgorithm: metadata.hashAlgorithm ?? existingMetadata.hashAlgorithm,
+                    contentType: metadata.contentType ?? existingMetadata.contentType,
+                    chunkType: metadata.chunkType ?? existingMetadata.chunkType,
+                    originalFilename: metadata.originalFilename ?? existingMetadata.originalFilename,
+                    originalPaths: Array(mergedPaths).sorted(),
+                    created: earliestCreated ?? metadata.created ?? existingMetadata.created,
+                    modified: latestModified ?? metadata.modified ?? existingMetadata.modified,
+                    compression: metadata.compression ?? existingMetadata.compression
+                )
+            }
+        }
+        
+        // Write metadata as JSON
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        let metadataData = try encoder.encode(finalMetadata)
+        try metadataData.write(to: url)
+    }
+    
+    /// Read metadata from file
+    public func readMetadata(_ identifier: ChunkIdentifier) throws -> ChunkMetadata? {
+        let url = fileURL(for: identifier)
+        let metadataURL = url.appendingPathExtension("meta")
+        
+        guard FileManager.default.fileExists(atPath: metadataURL.path) else {
+            return nil
+        }
+        
+        let data = try Data(contentsOf: metadataURL)
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(ChunkMetadata.self, from: data)
     }
     
     public func readChunk(_ identifier: ChunkIdentifier) async throws -> Data? {
@@ -103,7 +171,17 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
     
     public func deleteChunk(_ identifier: ChunkIdentifier) async throws {
         let url = fileURL(for: identifier)
-        try FileManager.default.removeItem(at: url)
+        let metadataURL = url.appendingPathExtension("meta")
+        
+        // Delete data file
+        if FileManager.default.fileExists(atPath: url.path) {
+            try FileManager.default.removeItem(at: url)
+        }
+        
+        // Delete metadata file
+        if FileManager.default.fileExists(atPath: metadataURL.path) {
+            try FileManager.default.removeItem(at: metadataURL)
+        }
     }
     
     public func chunkExists(_ identifier: ChunkIdentifier) async throws -> Bool {

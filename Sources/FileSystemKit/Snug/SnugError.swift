@@ -13,6 +13,10 @@ public enum SnugError: Error, CustomStringConvertible {
     case extractionFailed(String)
     case unsupportedHashAlgorithm(String)
     case compressionFailed(String)
+    case brokenSymlink(String, target: String)
+    case symlinkCycle(String)
+    case permissionDenied(String)
+    case embeddedFileNotFound(String)
     
     public var description: String {
         switch self {
@@ -34,6 +38,14 @@ public enum SnugError: Error, CustomStringConvertible {
             return "Unsupported hash algorithm: \(algorithm)"
         case .compressionFailed(let reason):
             return "Compression failed: \(reason)"
+        case .brokenSymlink(let path, let target):
+            return "Broken symlink: \(path) -> \(target)"
+        case .symlinkCycle(let path):
+            return "Symlink cycle detected: \(path)"
+        case .permissionDenied(let path):
+            return "Permission denied: \(path)"
+        case .embeddedFileNotFound(let hash):
+            return "Embedded file not found in archive: \(hash)"
         }
     }
 }

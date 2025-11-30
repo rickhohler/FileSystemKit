@@ -17,6 +17,8 @@ A Swift package providing modern file system and disk image format support. File
 - **File Extension Registry**: Centralized file extension management
 - **Chunk Storage**: Efficient binary data storage abstraction
 - **Metadata Storage**: Metadata storage abstraction for disk image information
+- **SNUG Archive Support**: Content-addressable archive format with metadata persistence
+- **Multi-Storage Configuration**: Primary, secondary, glacier, and mirror storage volume types
 
 ## Architecture
 

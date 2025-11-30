@@ -10,6 +10,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Future enhancements and features
 
+## [1.1.0] - 2025-01-15
+
+### Added
+- **Storage Volume Types**: Enhanced storage configuration with volume type classification
+  - `StorageVolumeType` enum: `primary`, `secondary`, `glacier`, `mirror`
+  - Default priority values based on volume type
+  - Volume type-based storage location management
+  - Resolves storage organization and redundancy needs
+
+- **Metadata Persistence**: Comprehensive metadata storage for hash-named files
+  - `.meta` JSON files stored alongside hash-named files
+  - Tracks original filenames, paths, creation/modification timestamps
+  - Metadata merging on deduplication (combines original paths, preserves earliest created date, latest modified date)
+  - `readMetadata()` method for retrieving stored metadata
+  - Automatic metadata file cleanup on chunk deletion
+
+- **Glacier Storage Mirroring**: Automatic mirroring to glacier/backup volumes
+  - Glacier volumes always mirrored during archive creation
+  - Asynchronous mirroring that doesn't block operations
+  - Graceful handling of glacier storage failures
+  - Multiple glacier storage location support
+
+- **Enhanced Configuration Management**: Improved storage configuration system
+  - Volume type-based storage location organization
+  - Priority-based storage selection
+  - Configuration validation with detailed error reporting
+  - Storage speed classification (very-fast, fast, medium, slow, very-slow, unknown)
+
+- **Comprehensive Unit Tests**: Complete test coverage for new features
+  - `SnugStorageTests`: Metadata persistence and merging tests
+  - `SnugConfigTests`: Volume type and configuration management tests
+  - `SnugMirroredStorageTests`: Glacier mirroring and multi-storage operation tests
+
+### Changed
+- **ChunkMetadata**: Extended with timestamp and path tracking
+  - Added `originalPaths` array to track all locations where content appears
+  - Added `created` and `modified` Date fields
+  - Enhanced metadata merging logic for deduplication scenarios
+
+- **SnugFileSystemChunkStorage**: Enhanced with metadata persistence
+  - Automatic `.meta` file creation/updating on chunk writes
+  - Metadata merging when same hash is written multiple times
+  - Metadata cleanup on chunk deletion
+
+- **SnugMirroredChunkStorage**: Enhanced with glacier storage support
+  - Separate glacier storage array for backup/archival volumes
+  - Glacier writes happen asynchronously and don't fail operations
+  - Improved read fallback order (primary → mirror → glacier)
+
+### Fixed
+- **Configuration Validation**: Improved error handling and reporting
+  - Better distinction between required and optional storage locations
+  - Clearer error messages for missing or unwritable storage
+
 ### Fixed
 - **GZIP Compression/Decompression**: Fixed GZIP format handling
   - Corrected GZIP header parsing in `GzipCompressionAdapter.decompress`

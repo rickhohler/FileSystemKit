@@ -6,22 +6,41 @@ import Foundation
 /// Extracts files from SNUG archives
 public class SnugExtractor {
     let storageURL: URL
-    let chunkStorage: SnugFileSystemChunkStorage
+    let chunkStorage: ChunkStorage
     
     public init(storageURL: URL) throws {
         self.storageURL = storageURL
-        self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
+        
+        // Check if mirroring is enabled or glacier volumes exist in config
+        if let config = try? SnugConfigManager.load() {
+            let hasGlacierVolumes = config.storageLocations.contains { $0.volumeType == .glacier }
+            let hasMirrorVolumes = config.storageLocations.contains { $0.volumeType == .mirror || $0.volumeType == .secondary }
+            
+            if config.enableMirroring || hasGlacierVolumes || hasMirrorVolumes {
+                self.chunkStorage = try SnugStorage.createMirroredChunkStorage(from: config)
+            } else {
+                self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
+            }
+        } else {
+            self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
+        }
+    }
+    
+    /// Initialize with explicit chunk storage (for testing or custom storage)
+    public init(chunkStorage: ChunkStorage) {
+        self.storageURL = URL(fileURLWithPath: "/")
+        self.chunkStorage = chunkStorage
     }
     
     // Synchronous wrapper for async operations
-    public func extractArchive(from archiveURL: URL, to outputURL: URL, verbose: Bool) throws {
+    public func extractArchive(from archiveURL: URL, to outputURL: URL, verbose: Bool, preservePermissions: Bool = false) throws {
         let semaphore = DispatchSemaphore(value: 0)
         let resultHolder = ExtractionResultHolder()
         let storage = chunkStorage
         
-        Task { @Sendable [storage, archiveURL, outputURL, verbose, resultHolder] in
+        Task { @Sendable [storage, archiveURL, outputURL, verbose, preservePermissions, resultHolder] in
             do {
-                try await Self.extractArchiveAsync(from: archiveURL, to: outputURL, verbose: verbose, storage: storage)
+                try await Self.extractArchiveAsync(from: archiveURL, to: outputURL, verbose: verbose, storage: storage, preservePermissions: preservePermissions)
                 semaphore.signal()
             } catch {
                 resultHolder.error = error
@@ -36,7 +55,7 @@ public class SnugExtractor {
         }
     }
     
-    private static func extractArchiveAsync(from archiveURL: URL, to outputURL: URL, verbose: Bool, storage: SnugFileSystemChunkStorage) async throws {
+    private static func extractArchiveAsync(from archiveURL: URL, to outputURL: URL, verbose: Bool, storage: ChunkStorage, preservePermissions: Bool = false) async throws {
     
         // 1. Parse archive
         let parser = SnugParser()
@@ -49,11 +68,16 @@ public class SnugExtractor {
             attributes: nil
         )
         
-        // 3. Extract entries
+        // 3. Extract entries with error recovery
+        var extractedCount = 0
+        var errorCount = 0
+        var errors: [String] = []
+        
         for entry in archive.entries {
             let entryURL = outputURL.appendingPathComponent(entry.path)
             
-            if entry.type == "directory" {
+            do {
+                if entry.type == "directory" {
                 // Create directory
                 try FileManager.default.createDirectory(
                     at: entryURL,
@@ -61,8 +85,36 @@ public class SnugExtractor {
                     attributes: nil
                 )
                 
+                // Preserve permissions if requested
+                if preservePermissions {
+                    applyPermissions(to: entryURL, from: entry)
+                }
+                
                 if verbose {
                     print("  Created directory: \(entry.path)")
+                }
+            } else if entry.type == "symlink", let target = entry.target {
+                // Create symlink
+                // Create parent directory if needed
+                try FileManager.default.createDirectory(
+                    at: entryURL.deletingLastPathComponent(),
+                    withIntermediateDirectories: true,
+                    attributes: nil
+                )
+                
+                // Remove existing file/symlink if it exists
+                if FileManager.default.fileExists(atPath: entryURL.path) {
+                    try FileManager.default.removeItem(at: entryURL)
+                }
+                
+                // Create symlink
+                try FileManager.default.createSymbolicLink(
+                    atPath: entryURL.path,
+                    withDestinationPath: target
+                )
+                
+                if verbose {
+                    print("  Created symlink: \(entry.path) -> \(target)")
                 }
             } else if entry.type == "file", let hash = entry.hash {
                 // Resolve hash and extract file
@@ -83,10 +135,50 @@ public class SnugExtractor {
                 // Write file
                 try fileData.write(to: entryURL)
                 
+                // Preserve permissions if requested
+                if preservePermissions {
+                    applyPermissions(to: entryURL, from: entry)
+                }
+                
                 if verbose {
                     print("  Extracted: \(entry.path) (\(hash.prefix(8))...)")
                 }
+                }
+                
+                extractedCount += 1
+            } catch {
+                errorCount += 1
+                let errorMsg = "Failed to extract \(entry.path): \(error.localizedDescription)"
+                errors.append(errorMsg)
+                
+                if verbose {
+                    print("  Error: \(errorMsg)")
+                }
+                
+                // Continue with next entry
+                continue
             }
+        }
+        
+        // Report results
+        if verbose || errorCount > 0 {
+            print("")
+            print("Extraction complete:")
+            print("  Extracted: \(extractedCount) entries")
+            if errorCount > 0 {
+                print("  Errors: \(errorCount)")
+                for error in errors.prefix(5) {
+                    print("    \(error)")
+                }
+                if errors.count > 5 {
+                    print("    ... and \(errors.count - 5) more errors")
+                }
+            }
+        }
+        
+        // Throw if all extractions failed
+        if extractedCount == 0 && errorCount > 0 {
+            throw SnugError.storageError("Failed to extract all entries")
         }
     }
 }
@@ -94,6 +186,32 @@ public class SnugExtractor {
 // Helper class for thread-safe error storage
 private final class ExtractionResultHolder: @unchecked Sendable {
     var error: Error?
+}
+
+// Helper function to apply permissions from archive entry
+private func applyPermissions(to url: URL, from entry: ArchiveEntry) {
+    // Apply file permissions (Unix-style)
+    if let permissions = entry.permissions {
+        // Parse octal permissions (e.g., "0755")
+        if let mode = parseOctalPermissions(permissions) {
+            let attributes: [FileAttributeKey: Any] = [.posixPermissions: mode]
+            try? FileManager.default.setAttributes(attributes, ofItemAtPath: url.path)
+        }
+    }
+    
+    // Note: Setting owner/group requires root privileges on macOS
+    // This is typically not possible for regular users, so we skip it
+    // In a production system, you might want to use chown via Process if running as root
+}
+
+// Helper function to parse octal permissions string
+private func parseOctalPermissions(_ permissions: String) -> Int? {
+    // Remove leading zeros and parse as octal
+    let trimmed = permissions.trimmingCharacters(in: CharacterSet(charactersIn: "0"))
+    guard !trimmed.isEmpty else {
+        return Int(permissions, radix: 8)
+    }
+    return Int(trimmed, radix: 8)
 }
 
 
