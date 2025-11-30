@@ -259,7 +259,7 @@ public struct SnugConfigManager {
         let path = url.path
         
         // Resolve to actual volume path
-        var volumeURL: URL?
+        // Note: volumeURL is reserved for future use when we implement volume path resolution
         var isNetwork = false
         var isExternal = false
         var isSSD = false
@@ -452,7 +452,7 @@ extension SnugConfigManager {
         
         let data = try Data(contentsOf: configURL)
         let decoder = YAMLDecoder()
-        var config = try decoder.decode(SnugConfig.self, from: data)
+        let config = try decoder.decode(SnugConfig.self, from: data)
         
         // Ensure failIfPrimaryUnavailable defaults to true if not set
         // (for backward compatibility, check if it's explicitly false in YAML)
