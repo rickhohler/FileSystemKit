@@ -146,9 +146,9 @@ final class DirectoryParserTests: XCTestCase {
     // MARK: - Helper Class
     
     private class TestDirectoryParserDelegate: DirectoryParserDelegate {
-        let processEntryHandler: (DirectoryEntry) throws -> Bool
+        let processEntryHandler: @Sendable (DirectoryEntry) throws -> Bool
         
-        init(processEntryHandler: @escaping (DirectoryEntry) throws -> Bool) {
+        init(processEntryHandler: @escaping @Sendable (DirectoryEntry) throws -> Bool) {
             self.processEntryHandler = processEntryHandler
         }
         
