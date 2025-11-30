@@ -62,13 +62,23 @@ final class DirectoryParserTests: XCTestCase {
         let parser = DirectoryParser(options: options, delegate: delegate)
         try parser.parse(tempDirectory)
         
-        // Get all entries as an array for easier debugging
+        // Get all entries as an array - DirectoryParser processes directories too
         let allEntries = entries.filter { _ in true }
         let fileEntries = allEntries.filter { $0.type == "file" }
         
-        XCTAssertEqual(fileEntries.count, 2, "Expected 2 files, found \(fileEntries.count). All entries: \(allEntries.map { $0.path })")
-        XCTAssertTrue(fileEntries.contains { $0.path == "file1.txt" })
-        XCTAssertTrue(fileEntries.contains { $0.path == "file2.txt" })
+        // Debug: Print all entries
+        let allPaths = allEntries.map { "\($0.type):\($0.path)" }
+        print("All entries found: \(allPaths)")
+        
+        // Should have exactly 2 file entries (DirectoryParser doesn't include root directory)
+        XCTAssertEqual(fileEntries.count, 2, "Expected 2 files, found \(fileEntries.count). All entries: \(allPaths)")
+        
+        // Check that both files are present
+        let file1Found = fileEntries.contains { $0.path == "file1.txt" }
+        let file2Found = fileEntries.contains { $0.path == "file2.txt" }
+        
+        XCTAssertTrue(file1Found, "file1.txt not found. Found paths: \(fileEntries.map { $0.path })")
+        XCTAssertTrue(file2Found, "file2.txt not found. Found paths: \(fileEntries.map { $0.path })")
     }
     
     func testParseDirectoryWithSubdirectories() throws {
@@ -167,10 +177,22 @@ final class DirectoryParserTests: XCTestCase {
             return array.count
         }
         
-        func compactMap<U>(_ transform: (T) -> U?) -> [U] {
+        func compactMap<U>(_ transform: @escaping (T) -> U?) -> [U] {
             lock.lock()
             defer { lock.unlock() }
             return array.compactMap(transform)
+        }
+        
+        func filter(_ predicate: @escaping (T) -> Bool) -> [T] {
+            lock.lock()
+            defer { lock.unlock() }
+            return array.filter(predicate)
+        }
+        
+        func map<U>(_ transform: @escaping (T) -> U) -> [U] {
+            lock.lock()
+            defer { lock.unlock() }
+            return array.map(transform)
         }
         
         func contains(where predicate: @escaping (T) -> Bool) -> Bool {

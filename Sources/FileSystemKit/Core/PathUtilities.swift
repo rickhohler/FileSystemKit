@@ -32,7 +32,11 @@ public struct PathUtilities {
     ///   - basePath: Optional base path prefix
     /// - Returns: Relative path string
     public static func relativePath(from url: URL, baseURL: URL, basePath: String = "") -> String {
-        let relativePath = url.path.replacingOccurrences(of: baseURL.path, with: basePath)
+        // Resolve symlinks to handle macOS /var -> /private/var symlink
+        let resolvedBaseURL = baseURL.resolvingSymlinksInPath()
+        let resolvedURL = url.resolvingSymlinksInPath()
+        
+        let relativePath = resolvedURL.path.replacingOccurrences(of: resolvedBaseURL.path, with: basePath)
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
         return normalize(relativePath)
     }
