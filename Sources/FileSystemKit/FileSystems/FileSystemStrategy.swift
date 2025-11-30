@@ -239,7 +239,7 @@ public class FileSystemStrategyFactory {
     /// - Note: This creates a "detection-only" instance. For parsing, use `createStrategy(for:diskData:)` instead.
     public static func createStrategy(for format: FileSystemFormat) -> FileSystemStrategy? {
         ensureInitialized()
-        guard let strategyType = registeredStrategies[format] else {
+        guard registeredStrategies[format] != nil else {
             return nil
         }
         
