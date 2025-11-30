@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2025-11-30
+
 ### Changed
 - **BREAKING**: Renamed `File` → `FileSystemEntry` to avoid naming conflicts
   - `File` class renamed to `FileSystemEntry` (represents files only)
@@ -15,8 +17,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Added `toChunk()` method to convert `FileSystemEntry` to `Chunk`
   - Made `FileLocation` optional in `FileSystemEntryMetadata` (not all entries have disk image location)
   - Updated `FileSystemStrategy` protocol to use `FileSystemEntry`
-  - Backward compatibility: Typealiases `File` → `FileSystemEntry` and `FileMetadata` → `FileSystemEntryMetadata` (deprecated)
+  - Removed deprecated typealiases `File` and `FileMetadata` (breaking change)
   - Clarified that `FileSystemEntry` represents files only; directories use `FileSystemFolder`
+- **BREAKING**: Updated `FileSystemError` enum cases to require parameters
+  - `invalidOffset` now requires `(offset: Int?, maxOffset: Int?)`
+  - `invalidFileSystem` now requires `(reason: String?)`
+  - `unsupportedFileSystemFormat` now requires `(format: String?)`
+  - `fileNotFound` now requires `(path: String?)`
+  - `storageUnavailable` now requires `(reason: String?)`
 
 ### Added
 - **Core Types**: New reusable core types for common file system operations
@@ -26,10 +34,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `PathUtilities`: Path manipulation utilities (normalize, relativePath, isSystemFile, isHidden)
   - `FileTypeDetector`: File type detection (DMG, ISO, VHD, etc.)
   - `FileCounter`: File counting utilities for directory trees
+- **Tests**: Comprehensive test coverage for core types
+  - `ChunkTests`: Tests for Chunk lazy loading and builder pattern (moved from RetroboxFS)
+  - `DirectoryParserTests`: Tests for directory parsing
+  - `FileCounterTests`: Tests for file counting
+  - `FileMetadataTests`: Tests for metadata collection
+  - `FileTypeDetectorTests`: Tests for file type detection
+  - `PathUtilitiesTests`: Tests for path utilities
 - **Documentation**: Comprehensive architecture analysis documents
   - `CHUNK_VS_FILE_ANALYSIS.md`: Analysis of Chunk vs FileSystemEntry architecture
   - `NAMING_PROPOSAL.md`: Naming proposal for File → FileSystemEntry
   - `FILESYSTEMENTRY_DIRECTORY_CLARIFICATION.md`: Clarification of FileSystemEntry vs FileSystemFolder
+  - `FILESYSTEMENTRY_DATA_SOURCES.md`: Documentation on FileSystemEntry supporting physical files and data streams
+
+### Fixed
+- Fixed all compiler warnings and errors across all projects
+- Fixed `FileSystemError` enum case usage throughout codebase
+- Fixed Sendable conformance issues in test code
+- Fixed path normalization to preserve leading slashes for absolute paths
+- Fixed relative path calculation to resolve symlinks for accurate paths
 
 ## [1.2.2] - 2025-11-30
 
