@@ -174,7 +174,8 @@ public struct FileSystemEntryMetadata: Codable {
 
 // MARK: - FileSystemEntry
 
-/// Represents an entry in a file system (file or directory).
+/// Represents a file entry in a file system.
+/// For directories, use FileSystemFolder instead.
 /// Implements lazy loading: metadata is always loaded, content is loaded on demand.
 public class FileSystemEntry: FileSystemComponent {
     /// Entry metadata (always loaded, lightweight)
