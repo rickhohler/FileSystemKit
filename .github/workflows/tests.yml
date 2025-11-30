@@ -46,9 +46,14 @@ jobs:
           # Find profdata file
           PROF_DATA=$(find .build -name "default.profdata" -type f | head -1)
           
-          # Find test binary - try multiple patterns
+          # Find test binary - try multiple patterns for FileSystemKit
           BINARY=""
-          XCTEST_BUNDLE=$(find .build -name "*PackageTests.xctest" -type d | head -1)
+          XCTEST_BUNDLE=$(find .build -name "*FileSystemKitTests.xctest" -type d | head -1)
+          
+          # Fallback to PackageTests pattern
+          if [ -z "$XCTEST_BUNDLE" ]; then
+            XCTEST_BUNDLE=$(find .build -name "*PackageTests.xctest" -type d | head -1)
+          fi
           
           if [ -n "$XCTEST_BUNDLE" ]; then
             # Try standard path
@@ -63,6 +68,11 @@ jobs:
           fi
           
           # Fallback: find any test binary
+          if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
+            BINARY=$(find .build -name "*FileSystemKitTests" -type f -perm +111 -path "*/Contents/MacOS/*" | head -1)
+          fi
+          
+          # Final fallback: any test binary
           if [ -z "$BINARY" ] || [ ! -f "$BINARY" ]; then
             BINARY=$(find .build -name "*Tests" -type f -perm +111 -path "*/Contents/MacOS/*" | head -1)
           fi
@@ -81,6 +91,7 @@ jobs:
             echo "Warning: test binary not found"
             echo "Searching for test binaries..."
             find .build -name "*Tests*" -type f 2>/dev/null | head -10
+            find .build -name "*.xctest" -type d 2>/dev/null | head -5
           fi
       
       - name: Generate code coverage report
