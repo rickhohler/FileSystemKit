@@ -96,16 +96,10 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
                 let decoder = JSONDecoder()
                 decoder.dateDecodingStrategy = .iso8601
                 let existingMetadata = try decoder.decode(ChunkMetadata.self, from: existingData)
-                // Merge original paths
+                // Merge original paths (only merge paths, not filenames which are redundant)
                 var mergedPaths = Set(existingMetadata.originalPaths ?? [])
-                if let originalFilename = existingMetadata.originalFilename {
-                    mergedPaths.insert(originalFilename)
-                }
                 if let paths = metadata.originalPaths {
                     mergedPaths.formUnion(paths)
-                }
-                if let originalFilename = metadata.originalFilename {
-                    mergedPaths.insert(originalFilename)
                 }
                 
                 // Use earliest created date, latest modified date
