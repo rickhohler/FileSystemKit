@@ -10,6 +10,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Future enhancements and features
 
+## [1.2.1] - 2025-01-15
+
+### Fixed
+- Fixed all compiler warnings in codebase
+  - Removed unused 'path' variables in embeddedFiles loops
+  - Added explanatory comment for deprecated CC_MD5 usage
+  - Refactored ternary operators to if-else to resolve "will never be executed" warnings
+  - Removed unused volumeURL variable in SnugConfig
+  - Changed var config to let config where not mutated
+- Fixed GitHub Actions build failure
+  - Removed reference to unimplemented processDirectoryConcurrent method
+  - Reverted to using existing processDirectory method
+
 ## [1.2.0] - 2025-01-15
 
 ### Added
