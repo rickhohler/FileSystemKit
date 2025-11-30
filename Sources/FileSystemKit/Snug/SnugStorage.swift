@@ -77,7 +77,8 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
         // Write or update metadata file (always update to track all original paths)
         if let metadata = metadata {
             let metadataURL = url.appendingPathExtension("meta")
-            try writeMetadata(metadata, to: metadataURL, identifier: identifier, isNewFile: isNewFile)
+            let isNewMetadataFile = !FileManager.default.fileExists(atPath: metadataURL.path)
+            try writeMetadata(metadata, to: metadataURL, identifier: identifier, isNewFile: isNewMetadataFile)
         }
         
         return identifier
@@ -85,10 +86,11 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
     
     /// Write metadata to file (JSON format)
     private func writeMetadata(_ metadata: ChunkMetadata, to url: URL, identifier: ChunkIdentifier, isNewFile: Bool) throws {
-        // If file exists, read existing metadata to merge original paths
+        // If metadata file exists, read existing metadata to merge original paths
         var finalMetadata = metadata
         
-        if !isNewFile, let existingData = try? Data(contentsOf: url) {
+        // Always try to read existing metadata if file exists (for merging)
+        if FileManager.default.fileExists(atPath: url.path), let existingData = try? Data(contentsOf: url) {
             if let existingMetadata = try? JSONDecoder().decode(ChunkMetadata.self, from: existingData) {
                 // Merge original paths
                 var mergedPaths = Set(existingMetadata.originalPaths ?? [])
@@ -110,13 +112,13 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
                     size: metadata.size,
                     contentHash: metadata.contentHash ?? existingMetadata.contentHash,
                     hashAlgorithm: metadata.hashAlgorithm ?? existingMetadata.hashAlgorithm,
-                    contentType: metadata.contentType ?? existingMetadata.contentType,
+                    contentType: existingMetadata.contentType ?? metadata.contentType,  // Prefer existing (first write)
                     chunkType: metadata.chunkType ?? existingMetadata.chunkType,
-                    originalFilename: metadata.originalFilename ?? existingMetadata.originalFilename,
+                    originalFilename: existingMetadata.originalFilename ?? metadata.originalFilename,  // Prefer existing (first write)
                     originalPaths: Array(mergedPaths).sorted(),
-                    created: earliestCreated ?? metadata.created ?? existingMetadata.created,
-                    modified: latestModified ?? metadata.modified ?? existingMetadata.modified,
-                    compression: metadata.compression ?? existingMetadata.compression
+                    created: earliestCreated ?? existingMetadata.created ?? metadata.created,
+                    modified: latestModified ?? existingMetadata.modified ?? metadata.modified,
+                    compression: existingMetadata.compression ?? metadata.compression  // Prefer existing (first write)
                 )
             }
         }

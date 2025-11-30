@@ -654,15 +654,16 @@ public class SnugArchiver {
                         // Embed file directly in archive
                         embeddedFiles.append((hash: hash, data: fileData, path: relativePath))
                         
+                        let (owner, group) = self.getOwnerAndGroup(from: fileURL)
                         let entry = ArchiveEntry(
                             type: "file",
                             path: relativePath,
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: getPermissions(from: fileURL),
-                            owner: getOwnerAndGroup(from: fileURL).owner,
-                            group: getOwnerAndGroup(from: fileURL).group,
+                            permissions: self.getPermissions(from: fileURL),
+                            owner: owner,
+                            group: group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: true,
@@ -734,21 +735,22 @@ public class SnugArchiver {
                     processedHashes.insert(hash)
                 }
                 
-                        // File entry (hash storage)
-                        let entry = ArchiveEntry(
-                            type: "file",
-                            path: relativePath,
-                            hash: hash,
-                            size: fileData.count,
-                            target: nil,
-                            permissions: getPermissions(from: fileURL),
-                            owner: getOwnerAndGroup(from: fileURL).owner,
-                            group: getOwnerAndGroup(from: fileURL).group,
-                            modified: resourceValues.contentModificationDate,
-                            created: resourceValues.creationDate,
-                            embedded: false,
-                            embeddedOffset: nil
-                        )
+                // File entry (hash storage)
+                let (owner, group) = self.getOwnerAndGroup(from: fileURL)
+                let entry = ArchiveEntry(
+                    type: "file",
+                    path: relativePath,
+                    hash: hash,
+                    size: fileData.count,
+                    target: nil,
+                    permissions: self.getPermissions(from: fileURL),
+                    owner: owner,
+                    group: group,
+                    modified: resourceValues.contentModificationDate,
+                    created: resourceValues.creationDate,
+                    embedded: false,
+                    embeddedOffset: nil
+                )
                         entries.append(entry)
                         
                         filesProcessed += 1
