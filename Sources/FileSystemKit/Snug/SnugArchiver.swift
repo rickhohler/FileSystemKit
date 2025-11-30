@@ -520,7 +520,7 @@ public class SnugArchiver {
                         
                         Task { [chunkStorage] in
                             do {
-                                _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: metadata)
+                                _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: resolvedChunkMetadata)
                                 semaphore.signal()
                             } catch {
                                 errorHolder.error = error
