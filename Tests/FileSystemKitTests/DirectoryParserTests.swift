@@ -47,7 +47,7 @@ final class DirectoryParserTests: XCTestCase {
         try "test1".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file1.txt"))
         try "test2".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file2.txt"))
         
-        let entries = NSMutableArray()
+        let entries = NSLockedArray<DirectoryEntry>()
         let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
@@ -63,8 +63,8 @@ final class DirectoryParserTests: XCTestCase {
         try parser.parse(tempDirectory)
         
         XCTAssertEqual(entries.count, 2)
-        XCTAssertTrue(entries.contains { $0.path == "file1.txt" })
-        XCTAssertTrue(entries.contains { $0.path == "file2.txt" })
+        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "file1.txt" })
+        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "file2.txt" })
     }
     
     func testParseDirectoryWithSubdirectories() throws {
@@ -76,7 +76,7 @@ final class DirectoryParserTests: XCTestCase {
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file.txt"))
         try "test".data(using: .utf8)!.write(to: subDir.appendingPathComponent("subfile.txt"))
         
-        let entries = NSMutableArray()
+        let entries = NSLockedArray<DirectoryEntry>()
         let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let options = DirectoryParserOptions(
@@ -93,9 +93,9 @@ final class DirectoryParserTests: XCTestCase {
         
         // Should find directory, file in root, and file in subdir
         XCTAssertTrue(entries.count >= 3)
-        XCTAssertTrue(entries.contains { $0.type == "directory" && $0.path == "subdir" })
-        XCTAssertTrue(entries.contains { $0.path == "file.txt" })
-        XCTAssertTrue(entries.contains { $0.path == "subdir/subfile.txt" })
+        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.type == "directory" && entry.path == "subdir" })
+        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "file.txt" })
+        XCTAssertTrue(entries.contains { (entry: DirectoryEntry) in entry.path == "subdir/subfile.txt" })
     }
     
     // MARK: - Ignore Pattern Tests
@@ -106,7 +106,7 @@ final class DirectoryParserTests: XCTestCase {
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("file2.txt"))
         try "test".data(using: .utf8)!.write(to: tempDirectory.appendingPathComponent("ignore.txt"))
         
-        let entries = NSMutableArray()
+        let entries = NSLockedArray<DirectoryEntry>()
         let delegate = TestDirectoryParserDelegate(entries: entries)
         
         let ignoreMatcher = SnugIgnoreMatcher(patterns: ["ignore.txt"])
