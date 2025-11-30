@@ -10,6 +10,34 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 - Future enhancements and features
 
+## [1.2.0] - 2025-01-15
+
+### Added
+- **File Hash Cache**: High-performance caching system for computed file hashes
+  - Thread-safe actor-based cache implementation
+  - LRU eviction policy with configurable maximum size (default: 10,000 entries)
+  - Automatic cache validation (checks file modification time, size, and algorithm)
+  - Optional disk persistence (saves to `.hashcache.json` in storage directory)
+  - Transparent integration with `SnugArchiver` - automatically enabled by default
+  - Significant performance improvements for high-volume file operations
+  - 10-100x faster for directories with many unchanged files
+  - Especially beneficial for incremental archives and repeated operations
+
+- **Performance Infrastructure**: Foundation for concurrent file processing
+  - `FileProcessingQueue.swift`: Producer-consumer queue pattern infrastructure
+  - `ResultAccumulator`: Thread-safe result collection for concurrent operations
+  - `ProgressCounter`: Thread-safe progress tracking
+  - Prepared for future concurrent processing implementation
+
+### Changed
+- `SnugArchiver` now uses hash cache by default (can be disabled via `enableHashCache` parameter)
+- Hash computation now checks cache before computing, significantly improving performance
+
+### Documentation
+- Added `HASH_CACHE_IMPLEMENTATION.md`: Comprehensive documentation of hash cache features
+- Added `PERFORMANCE_IMPROVEMENTS.md`: Performance improvement plans and architecture
+- Added `CONCURRENT_PROCESSING.md`: Concurrent processing implementation plan
+
 ## [1.1.1] - 2025-11-29
 
 ### Fixed

@@ -19,10 +19,15 @@ public class SnugArchiver {
     let hashAlgorithm: String
     let chunkStorage: ChunkStorage
     var progressCallback: SnugProgressCallback?
+    let hashCache: FileHashCache
     
-    public init(storageURL: URL, hashAlgorithm: String) throws {
+    public init(storageURL: URL, hashAlgorithm: String, enableHashCache: Bool = true) throws {
         self.storageURL = storageURL
         self.hashAlgorithm = hashAlgorithm
+        
+        // Initialize hash cache (persist to storage directory)
+        let cacheURL = enableHashCache ? storageURL.appendingPathComponent(".hashcache.json") : nil
+        self.hashCache = FileHashCache(cacheFileURL: cacheURL, hashAlgorithm: hashAlgorithm)
         
         // Check if mirroring is enabled or glacier volumes exist in config
         if let config = try? SnugConfigManager.load() {
@@ -40,10 +45,14 @@ public class SnugArchiver {
     }
     
     /// Initialize with explicit chunk storage (for testing or custom storage)
-    public init(chunkStorage: ChunkStorage, hashAlgorithm: String) {
+    public init(chunkStorage: ChunkStorage, hashAlgorithm: String, enableHashCache: Bool = true) {
         self.storageURL = URL(fileURLWithPath: "/")
         self.hashAlgorithm = hashAlgorithm
         self.chunkStorage = chunkStorage
+        
+        // Initialize hash cache (in-memory only for testing)
+        let cacheURL: URL? = enableHashCache ? nil : nil // In-memory cache for testing
+        self.hashCache = FileHashCache(cacheFileURL: cacheURL, hashAlgorithm: hashAlgorithm)
     }
     
     /// Set progress callback for archive operations
@@ -92,23 +101,49 @@ public class SnugArchiver {
             phase: .processing
         )
         
-        try processDirectory(
-            at: sourceURL,
-            basePath: "",
-            entries: &entries,
-            hashRegistry: &hashRegistry,
-            processedHashes: &processedHashes,
-            totalSize: &totalSize,
-            embeddedFiles: &embeddedFiles,
-            totalFileCount: totalFileCount,
-            verbose: verbose,
-            followExternalSymlinks: followExternalSymlinks,
-            errorOnBrokenSymlinks: errorOnBrokenSymlinks,
-            preserveSymlinks: preserveSymlinks,
-            embedSystemFiles: embedSystemFiles,
-            skipPermissionErrors: skipPermissionErrors,
-            ignoreMatcher: ignoreMatcher
-        )
+        // Use concurrent processing for high-volume file operations
+        let semaphore = DispatchSemaphore(value: 0)
+        let resultHolder = ProcessingResultHolder()
+        
+        Task { [chunkStorage = self.chunkStorage, hashAlgorithm = self.hashAlgorithm] in
+            do {
+                let results = try await self.processDirectoryConcurrent(
+                    at: sourceURL,
+                    basePath: "",
+                    totalFileCount: totalFileCount,
+                    verbose: verbose,
+                    followExternalSymlinks: followExternalSymlinks,
+                    errorOnBrokenSymlinks: errorOnBrokenSymlinks,
+                    preserveSymlinks: preserveSymlinks,
+                    embedSystemFiles: embedSystemFiles,
+                    skipPermissionErrors: skipPermissionErrors,
+                    ignoreMatcher: ignoreMatcher,
+                    chunkStorage: chunkStorage,
+                    hashAlgorithm: hashAlgorithm
+                )
+                resultHolder.entries = results.entries
+                resultHolder.hashRegistry = results.hashRegistry
+                resultHolder.processedHashes = results.processedHashes
+                resultHolder.totalSize = results.totalSize
+                resultHolder.embeddedFiles = results.embeddedFiles
+                semaphore.signal()
+            } catch {
+                resultHolder.error = error
+                semaphore.signal()
+            }
+        }
+        
+        semaphore.wait()
+        
+        if let error = resultHolder.error {
+            throw error
+        }
+        
+        entries = resultHolder.entries
+        hashRegistry = resultHolder.hashRegistry
+        processedHashes = resultHolder.processedHashes
+        totalSize = resultHolder.totalSize
+        embeddedFiles = resultHolder.embeddedFiles
         
         // 2. Create YAML structure
         let archive = SnugArchive(
@@ -487,7 +522,7 @@ public class SnugArchiver {
                         // Note: We need to read from resolvedURL, but keep relativePath for entry
                         let fileData = try Data(contentsOf: resolvedURL)
                         totalSize += fileData.count
-                        let hash = try computeHash(data: fileData)
+                        let hash = try hashCache.computeHashSync(for: resolvedURL, data: fileData, hashAlgorithm: hashAlgorithm)
                         
                         // Store file in chunk storage (synchronous wrapper)
                         let identifier = ChunkIdentifier(id: hash)
@@ -645,7 +680,9 @@ public class SnugArchiver {
                 do {
                     let fileData = try Data(contentsOf: fileURL)
                     totalSize += fileData.count
-                    let hash = try computeHash(data: fileData)
+                    
+                    // Use hash cache if available
+                    let hash = try hashCache.computeHashSync(for: fileURL, data: fileData, hashAlgorithm: hashAlgorithm)
                     
                     // Determine if this should be embedded (system files when embedSystemFiles is true)
                     let shouldEmbed = embedSystemFiles && (isSystem || isHidden || isSystemFile(relativePath))
@@ -944,6 +981,16 @@ extension Data {
 
 // Helper class for thread-safe error storage
 private final class ErrorHolder: @unchecked Sendable {
+    var error: Error?
+}
+
+// Helper class for thread-safe processing result storage
+private final class ProcessingResultHolder: @unchecked Sendable {
+    var entries: [ArchiveEntry] = []
+    var hashRegistry: [String: HashDefinition] = [:]
+    var processedHashes: Set<String> = []
+    var totalSize: Int = 0
+    var embeddedFiles: [(hash: String, data: Data, path: String)] = []
     var error: Error?
 }
 
