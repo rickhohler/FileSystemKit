@@ -124,7 +124,7 @@ final class DirectoryParserTests: XCTestCase {
         try parser.parse(tempDirectory)
         
         XCTAssertEqual(entries.count, 2)
-        XCTAssertFalse(entries.contains { $0.path == "ignore.txt" })
+        XCTAssertFalse(entries.contains { (entry: DirectoryEntry) in entry.path == "ignore.txt" })
     }
     
     // MARK: - Helper Class
@@ -169,7 +169,7 @@ final class DirectoryParserTests: XCTestCase {
             return array.compactMap(transform)
         }
         
-        func contains(where predicate: (T) -> Bool) -> Bool {
+        func contains(where predicate: @escaping (T) -> Bool) -> Bool {
             lock.lock()
             defer { lock.unlock() }
             return array.contains(where: predicate)
