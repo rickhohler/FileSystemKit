@@ -139,6 +139,9 @@ public struct ISO9660FileSystemStrategy: FileSystemStrategy {
         }
         
         // Read file data from logical sector
+        guard let location = location else {
+            throw FileSystemError.diskDataNotAvailable
+        }
         let logicalSector = location.offset / ISO9660FileSystemStrategy.sectorSize
         let sectorOffset = location.offset % ISO9660FileSystemStrategy.sectorSize
         
@@ -509,7 +512,7 @@ private func parseDirectory(
                     length: record.dataLength
                 )
                 
-                let fileMetadata = FileMetadata(
+                let fileMetadata = FileSystemEntryMetadata(
                     name: record.identifier,
                     size: record.dataLength,
                     modificationDate: record.recordingDateAndTime,
@@ -519,7 +522,7 @@ private func parseDirectory(
                     hashes: [:]
                 )
                 
-                let file = File(metadata: fileMetadata)
+                let file = FileSystemEntry(metadata: fileMetadata)
                 directory.addChild(file)
             }
             

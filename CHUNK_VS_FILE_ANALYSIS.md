@@ -2,9 +2,9 @@
 
 ## Executive Summary
 
-**Recommendation: Adopt Chunk-based APIs for data access operations while keeping File for metadata and structure.**
+**Recommendation: Adopt Chunk-based APIs for data access operations while keeping FileSystemEntry for metadata and structure.**
 
-Using `Chunk` instead of `File` for data access operations provides significant architectural benefits:
+Using `Chunk` instead of `FileSystemEntry` for data access operations provides significant architectural benefits:
 - **Stream-based operations** instead of file-system dependencies
 - **Storage abstraction** (works with ChunkStorage, not just RawDiskData)
 - **Better scalability** for cloud/remote storage
@@ -12,15 +12,16 @@ Using `Chunk` instead of `File` for data access operations provides significant 
 
 ## Current Architecture
 
-### File (FileSystemComponent)
+### FileSystemEntry (FileSystemComponent)
 ```swift
-public class File: FileSystemComponent {
-    let metadata: FileMetadata  // Always loaded
+public class FileSystemEntry: FileSystemComponent {
+    let metadata: FileSystemEntryMetadata  // Always loaded
+    let chunkIdentifier: ChunkIdentifier?  // Reference to chunk storage
     private var _data: Data?    // Lazy-loaded
-    private weak var _cachedDiskData: RawDiskData?  // Disk image dependency
+    private weak var _cachedDiskData: RawDiskData?  // Disk image dependency (legacy)
     
-    func readData(from diskData: RawDiskData) throws -> Data
-    func readData() throws -> Data  // Requires cached RawDiskData
+    func readData(from diskData: RawDiskData) throws -> Data  // Legacy method
+    func toChunk(storage: ChunkStorage) async throws -> Chunk?  // New chunk-based access
 }
 ```
 
@@ -60,44 +61,46 @@ public struct Chunk: Sendable {
 
 1. **FileSystemStrategy.readFile()**
    ```swift
-   func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
+   func readFile(_ file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
    ```
-   - Takes `File` for metadata but uses `ChunkStorage` for actual data
-   - **Issue**: File requires RawDiskData, but we're using ChunkStorage
-   - **Solution**: Use Chunk directly
+   - Takes `FileSystemEntry` for metadata but uses `ChunkStorage` for actual data
+   - **Issue**: FileSystemEntry has legacy RawDiskData dependency, but we're using ChunkStorage
+   - **Solution**: Use Chunk directly via `file.toChunk()`
 
-2. **File.readData()**
+2. **FileSystemEntry.readData()**
    ```swift
-   func readData(from diskData: RawDiskData) throws -> Data
+   func readData(from diskData: RawDiskData) throws -> Data  // Legacy method
    ```
    - Requires entire disk image to be loaded
    - **Issue**: Doesn't work with ChunkStorage or streaming
-   - **Solution**: Create Chunk from File metadata
+   - **Solution**: Use `toChunk()` to create Chunk from FileSystemEntry
 
-3. **File.generateHash()**
+3. **FileSystemEntry.generateHash()**
    ```swift
    func generateHash(algorithm: HashAlgorithm) throws -> FileHash
    ```
    - Needs file content to compute hash
-   - **Issue**: Requires RawDiskData
-   - **Solution**: Use Chunk for content access
+   - **Issue**: Requires RawDiskData (legacy)
+   - **Solution**: Use Chunk for content access via `toChunk()`
 
 ## Recommended Architecture
 
-### Hybrid Approach: File for Structure, Chunk for Data
+### Hybrid Approach: FileSystemEntry for Structure, Chunk for Data
 
-**Principle**: Separate concerns - File handles metadata/structure, Chunk handles data access.
+**Principle**: Separate concerns - FileSystemEntry handles metadata/structure, Chunk handles data access.
 
-#### 1. File as Metadata Container
+#### 1. FileSystemEntry as Metadata Container
 ```swift
-public class File: FileSystemComponent {
-    let metadata: FileMetadata
+public class FileSystemEntry: FileSystemComponent {
+    let metadata: FileSystemEntryMetadata
     let chunkIdentifier: ChunkIdentifier?  // Reference to chunk storage
     
-    // Remove RawDiskData dependency
-    // Remove readData() methods that require RawDiskData
+    // Legacy RawDiskData dependency (deprecated)
+    // New: toChunk() method for chunk-based access
 }
 ```
+
+**Note**: `FileSystemEntry` represents **files only**. For directories, use `FileSystemFolder`.
 
 #### 2. Chunk for Data Access
 ```swift
@@ -107,13 +110,13 @@ func generateHash(_ chunk: Chunk, algorithm: HashAlgorithm) async throws -> File
 func detectFileType(_ chunk: Chunk) async throws -> FileTypeInfo
 ```
 
-#### 3. Conversion Between File and Chunk
+#### 3. Conversion Between FileSystemEntry and Chunk
 ```swift
-extension File {
-    /// Create a Chunk from this File's chunk identifier
-    func toChunk(storage: ChunkStorage, accessPattern: AccessPattern = .onDemand) async throws -> Chunk {
+extension FileSystemEntry {
+    /// Create a Chunk from this entry's chunk identifier
+    func toChunk(storage: ChunkStorage, accessPattern: AccessPattern = .onDemand) async throws -> Chunk? {
         guard let identifier = chunkIdentifier else {
-            throw FileSystemError.chunkIdentifierNotAvailable
+            return nil  // No chunk identifier available
         }
         return try await Chunk.builder()
             .storage(storage)
@@ -124,30 +127,30 @@ extension File {
 }
 
 extension Chunk {
-    /// Create a File from this Chunk's metadata
-    func toFile(metadata: FileMetadata) -> File {
-        return File(metadata: metadata, chunkIdentifier: identifier)
+    /// Create a FileSystemEntry from this Chunk's metadata
+    func toFileSystemEntry(metadata: FileSystemEntryMetadata) -> FileSystemEntry {
+        return FileSystemEntry(metadata: metadata, chunkIdentifier: identifier)
     }
 }
 ```
 
 ## Migration Strategy
 
-### Phase 1: Add Chunk Support to File
-1. Add `chunkIdentifier: ChunkIdentifier?` to File
-2. Add `toChunk()` method to File
-3. Keep existing `readData()` methods for backward compatibility
-4. Mark as deprecated
+### Phase 1: Add Chunk Support to FileSystemEntry ✅ COMPLETED
+1. ✅ Added `chunkIdentifier: ChunkIdentifier?` to FileSystemEntry
+2. ✅ Added `toChunk()` method to FileSystemEntry
+3. ✅ Kept existing `readData()` methods for backward compatibility
+4. ✅ Legacy methods remain for compatibility
 
-### Phase 2: Update APIs to Accept Chunk
-1. Update `FileSystemStrategy.readFile()` to accept `Chunk` instead of `File`
+### Phase 2: Update APIs to Accept Chunk (In Progress)
+1. ✅ Updated `FileSystemStrategy.readFile()` to use `FileSystemEntry` (can be extended to accept Chunk)
 2. Create new `readFile(_ chunk: Chunk)` methods
 3. Keep old methods for backward compatibility
 
-### Phase 3: Remove RawDiskData Dependency
-1. Remove `readData(from: RawDiskData)` from File
-2. Update all callers to use Chunk-based APIs
-3. Remove RawDiskData from File class
+### Phase 3: Remove RawDiskData Dependency (Future)
+1. Mark `readData(from: RawDiskData)` as deprecated
+2. Update all callers to use Chunk-based APIs via `toChunk()`
+3. Eventually remove RawDiskData dependency from FileSystemEntry
 
 ## Benefits of Chunk-Based Architecture
 
@@ -191,7 +194,7 @@ func processChunk(_ chunk: Chunk) async throws {
 ### 1. FileSystemStrategy Protocol
 **Current:**
 ```swift
-func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
+func readFile(_ file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data
 ```
 
 **Recommended:**
@@ -199,7 +202,7 @@ func readFile(_ file: File, chunkStorage: ChunkStorage, identifier: ChunkIdentif
 func readFile(_ chunk: Chunk) async throws -> Data
 ```
 
-**Rationale**: File is only needed for metadata (name, location). Chunk already has identifier and storage reference.
+**Rationale**: FileSystemEntry is only needed for metadata (name, location). Chunk already has identifier and storage reference. Can use `file.toChunk()` to convert.
 
 ### 2. File Type Detection
 **Current:**
@@ -217,7 +220,7 @@ FileTypeDetector.detect(_ chunk: Chunk) async throws -> FileTypeInfo
 ### 3. Hash Generation
 **Current:**
 ```swift
-file.generateHash(algorithm: HashAlgorithm) throws -> FileHash
+fileSystemEntry.generateHash(algorithm: HashAlgorithm) throws -> FileHash  // Legacy, requires RawDiskData
 ```
 
 **Recommended:**
@@ -225,7 +228,7 @@ file.generateHash(algorithm: HashAlgorithm) throws -> FileHash
 func generateHash(_ chunk: Chunk, algorithm: HashAlgorithm) async throws -> FileHash
 ```
 
-**Rationale**: Can hash streams without loading entire file.
+**Rationale**: Can hash streams without loading entire file. Use `fileSystemEntry.toChunk()` to convert.
 
 ### 4. Compression Operations
 **Current:**
@@ -242,20 +245,20 @@ CompressionAdapter.decompress(_ chunk: Chunk) async throws -> Chunk
 
 ## Implementation Example
 
-### Before (File-based)
+### Before (Legacy FileSystemEntry-based)
 ```swift
 // Requires RawDiskData
-let file: File = ...
+let file: FileSystemEntry = ...
 let diskData: RawDiskData = ...
-let data = try file.readData(from: diskData)
-let hash = try file.generateHash()
+let data = try file.readData(from: diskData)  // Legacy method
+let hash = try file.generateHash()  // Legacy method
 ```
 
 ### After (Chunk-based)
 ```swift
 // Works with any storage
-let file: File = ...
-let chunk = try await file.toChunk(storage: chunkStorage)
+let fileSystemEntry: FileSystemEntry = ...
+let chunk = try await fileSystemEntry.toChunk(storage: chunkStorage)
 let data = try await chunk.readFull()
 let hash = try await generateHash(chunk, algorithm: .sha256)
 ```
@@ -263,9 +266,10 @@ let hash = try await generateHash(chunk, algorithm: .sha256)
 ## Compatibility Considerations
 
 ### Backward Compatibility
-- Keep File class for metadata and structure
-- Keep existing File APIs (mark as deprecated)
-- Provide migration path via `toChunk()` method
+- ✅ Keep FileSystemEntry class for metadata and structure
+- ✅ Keep existing FileSystemEntry APIs (legacy methods remain)
+- ✅ Provide migration path via `toChunk()` method
+- ✅ Typealias `File` → `FileSystemEntry` for backward compatibility (deprecated)
 
 ### Performance Impact
 - Chunk-based APIs are async (better for I/O)
@@ -277,11 +281,12 @@ let hash = try await generateHash(chunk, algorithm: .sha256)
 **Recommendation: Adopt Chunk-based APIs for all data access operations.**
 
 **Key Points:**
-1. ✅ Use `File` for metadata and file system structure
-2. ✅ Use `Chunk` for all data access operations
-3. ✅ Provide conversion methods between File and Chunk
-4. ✅ Keep backward compatibility during migration
-5. ✅ Enable streaming and remote storage support
+1. ✅ Use `FileSystemEntry` for file metadata and file system structure (files only)
+2. ✅ Use `FileSystemFolder` for directory structure (directories only)
+3. ✅ Use `Chunk` for all data access operations
+4. ✅ Provide conversion methods between FileSystemEntry and Chunk via `toChunk()`
+5. ✅ Keep backward compatibility during migration (typealiases provided)
+6. ✅ Enable streaming and remote storage support
 
 This architecture provides:
 - **Flexibility**: Works with any storage backend

@@ -43,7 +43,7 @@ final class SnugArchiverTests: XCTestCase {
     
     func testInitWithCustomChunkStorage() async throws {
         let customStorage = SnugFileSystemChunkStorage(baseURL: storageURL)
-        let archiver = SnugArchiver(
+        _ = SnugArchiver(
             chunkStorage: customStorage,
             hashAlgorithm: "sha256"
         )

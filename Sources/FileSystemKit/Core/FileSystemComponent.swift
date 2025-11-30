@@ -104,6 +104,9 @@ public struct FileHash: Hashable, Codable {
 
 /// Metadata for a file system entry (file or directory)
 /// Separated from file content for efficient batch processing
+/// 
+/// Note: For special files (block devices, character devices, sockets, FIFOs),
+/// use the `specialFileType` property to store special file type information.
 public struct FileSystemEntryMetadata: Codable {
     /// File name
     public let name: String
@@ -116,6 +119,10 @@ public struct FileSystemEntryMetadata: Codable {
     
     /// Detected file type category, if available
     public var fileType: FileTypeCategory?
+    
+    /// Special file type information (for block devices, character devices, sockets, FIFOs)
+    /// Use `SpecialFileType` from Core/SpecialFileType.swift to detect and store special file types
+    public var specialFileType: String?
     
     /// Additional attributes (system-specific)
     public var attributes: [String: Any]
@@ -131,6 +138,7 @@ public struct FileSystemEntryMetadata: Codable {
         size: Int,
         modificationDate: Date? = nil,
         fileType: FileTypeCategory? = nil,
+        specialFileType: String? = nil,
         attributes: [String: Any] = [:],
         location: FileLocation? = nil,
         hashes: [HashAlgorithm: FileHash] = [:]
@@ -139,6 +147,7 @@ public struct FileSystemEntryMetadata: Codable {
         self.size = size
         self.modificationDate = modificationDate
         self.fileType = fileType
+        self.specialFileType = specialFileType
         self.attributes = attributes
         self.location = location
         self.hashes = hashes
@@ -146,7 +155,7 @@ public struct FileSystemEntryMetadata: Codable {
     
     // Custom Codable implementation for attributes (Dictionary with Any values)
     enum CodingKeys: String, CodingKey {
-        case name, size, modificationDate, fileType, location, hashes
+        case name, size, modificationDate, fileType, specialFileType, location, hashes
     }
     
     public init(from decoder: Decoder) throws {
@@ -155,6 +164,7 @@ public struct FileSystemEntryMetadata: Codable {
         size = try container.decode(Int.self, forKey: .size)
         modificationDate = try container.decodeIfPresent(Date.self, forKey: .modificationDate)
         fileType = try container.decodeIfPresent(FileTypeCategory.self, forKey: .fileType)
+        specialFileType = try container.decodeIfPresent(String.self, forKey: .specialFileType)
         location = try container.decodeIfPresent(FileLocation.self, forKey: .location)
         hashes = try container.decode([HashAlgorithm: FileHash].self, forKey: .hashes)
         attributes = [:] // Attributes not encoded (Any type not Codable)
@@ -166,6 +176,7 @@ public struct FileSystemEntryMetadata: Codable {
         try container.encode(size, forKey: .size)
         try container.encodeIfPresent(modificationDate, forKey: .modificationDate)
         try container.encodeIfPresent(fileType, forKey: .fileType)
+        try container.encodeIfPresent(specialFileType, forKey: .specialFileType)
         try container.encodeIfPresent(location, forKey: .location)
         try container.encode(hashes, forKey: .hashes)
         // Attributes not encoded (Any type not Codable)
@@ -174,9 +185,25 @@ public struct FileSystemEntryMetadata: Codable {
 
 // MARK: - FileSystemEntry
 
-/// Represents a file entry in a file system.
+/// Represents a file entry that can be a physical file or a data stream.
 /// For directories, use FileSystemFolder instead.
 /// Implements lazy loading: metadata is always loaded, content is loaded on demand.
+/// 
+/// **Data Sources:**
+/// - Physical files on disk (via `readData(from: RawDiskData)` legacy method)
+/// - Data streams from any source (via `chunkIdentifier` and `toChunk()` method)
+///   - Network streams
+///   - Memory buffers
+///   - Cloud storage
+///   - Any custom ChunkStorage implementation
+/// 
+/// **Special Files:** FileSystemEntry can represent special files (block devices, character devices,
+/// sockets, FIFOs) when `metadata.specialFileType` is set. Use `SpecialFileType` from
+/// Core/SpecialFileType.swift to detect special files and set the type string.
+/// 
+/// **Architecture:** FileSystemEntry stores metadata and a reference to data (`chunkIdentifier`).
+/// The actual data access is handled by `Chunk` via `toChunk()`, which works with any ChunkStorage
+/// implementation (file system, network, cloud, memory, etc.).
 public class FileSystemEntry: FileSystemComponent {
     /// Entry metadata (always loaded, lightweight)
     public let metadata: FileSystemEntryMetadata
@@ -193,6 +220,13 @@ public class FileSystemEntry: FileSystemComponent {
     
     /// Modification date (from metadata)
     public var modificationDate: Date? { metadata.modificationDate }
+    
+    /// Special file type string, if this is a special file (block device, character device, socket, FIFO)
+    /// Returns nil for regular files
+    public var specialFileType: String? { metadata.specialFileType }
+    
+    /// True if this is a special file (block device, character device, socket, or FIFO)
+    public var isSpecialFile: Bool { metadata.specialFileType != nil }
     
     /// Parent folder
     public weak var parent: FileSystemFolder?
@@ -283,11 +317,21 @@ public class FileSystemEntry: FileSystemComponent {
         return [self]
     }
     
-    /// Create a Chunk from this entry's chunk identifier
+    /// Create a Chunk from this entry's chunk identifier for data access.
+    /// 
+    /// This method enables accessing the entry's data as a stream from any storage backend:
+    /// - Physical files (FileSystemChunkStorage)
+    /// - Network streams (custom ChunkStorage)
+    /// - Cloud storage (CloudKitChunkStorage, S3ChunkStorage, etc.)
+    /// - Memory buffers (custom ChunkStorage)
+    /// - Any other ChunkStorage implementation
+    /// 
     /// - Parameters:
-    ///   - storage: ChunkStorage to use for accessing chunk data
+    ///   - storage: ChunkStorage to use for accessing chunk data (can be any implementation)
     ///   - accessPattern: Access pattern for caching (default: onDemand)
     /// - Returns: Chunk instance if chunkIdentifier is available, nil otherwise
+    /// - Note: Use this method for accessing data streams. For physical files on disk images,
+    ///   use the legacy `readData(from: RawDiskData)` method.
     public func toChunk(storage: any ChunkStorage, accessPattern: AccessPattern = .onDemand) async throws -> Chunk? {
         guard let identifier = chunkIdentifier else {
             return nil
@@ -453,9 +497,9 @@ public class FileSystemFolder: FileSystemComponent {
 
 extension FileSystemFolder {
     /// Get all files in this directory (non-recursive)
-    /// - Returns: Array of File objects in this directory
-    public func getFiles() -> [File] {
-        return children.compactMap { $0 as? File }
+    /// - Returns: Array of FileSystemEntry objects in this directory
+    public func getFiles() -> [FileSystemEntry] {
+        return children.compactMap { $0 as? FileSystemEntry }
     }
     
     /// Get all subfolders in this folder (non-recursive)
@@ -471,7 +515,7 @@ extension FileSystemFolder {
         var folders: [FileSystemFolder] = []
         
         for child in children {
-            if let file = child as? File {
+            if let file = child as? FileSystemEntry {
                 files.append(file)
             } else if let folder = child as? FileSystemFolder {
                 folders.append(folder)
@@ -535,9 +579,9 @@ extension FileSystemFolder {
     
     /// Get a file by path
     /// - Parameter path: Path string (e.g., "folder/file.txt" or "/folder/file.txt")
-    /// - Returns: File at the specified path, or nil if not found
+    /// - Returns: FileSystemEntry at the specified path, or nil if not found
     /// - Note: Path can be absolute (starting with "/") or relative
-    public func getFile(at path: String) -> File? {
+    public func getFile(at path: String) -> FileSystemEntry? {
         let components = path.split(separator: "/").map(String.init)
         guard !components.isEmpty else {
             return nil
@@ -588,15 +632,7 @@ extension FileSystemFolder {
     }
 }
 
-// MARK: - Backward Compatibility Typealiases
-
-/// Backward compatibility: File is now FileSystemEntry
-/// Use FileSystemEntry in new code
-@available(*, deprecated, renamed: "FileSystemEntry", message: "Use FileSystemEntry instead to avoid naming conflicts")
-public typealias File = FileSystemEntry
-
-/// Backward compatibility: FileMetadata is now FileSystemEntryMetadata
-/// Use FileSystemEntryMetadata in new code
-@available(*, deprecated, renamed: "FileSystemEntryMetadata", message: "Use FileSystemEntryMetadata instead for clarity")
-public typealias FileMetadata = FileSystemEntryMetadata
+// MARK: - Backward Compatibility Typealiases (Removed)
+// The File and FileMetadata typealiases have been removed.
+// Use FileSystemEntry and FileSystemEntryMetadata instead.
 

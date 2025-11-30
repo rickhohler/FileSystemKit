@@ -18,6 +18,9 @@ import CommonCrypto
 import CryptoKit
 #endif
 
+// Import core types for directory parsing and file operations
+// These are in the same module, so they're available, but explicit imports help with clarity
+
 /// Creates SNUG archives from directory structures
 public class SnugArchiver {
     let storageURL: URL

@@ -157,7 +157,7 @@ if let type = await registry.type(forExtension: "dmg") {
 
 FileSystemKit is designed to be extended by other packages for specialized file system support. The core types, protocols, and architecture are all extensible:
 
-- **Core Types**: `RawDiskData`, `DiskGeometry`, `FileSystemComponent` can be extended
+- **Core Types**: `RawDiskData`, `DiskGeometry`, `FileSystemComponent`, `FileSystemEntry`, `FileSystemFolder` can be extended
 - **Protocols**: `DiskImageAdapter`, `FileSystemStrategy`, `CompressionAdapter` can be implemented by other packages
 - **Registries**: All registries support registration of custom adapters and strategies
 - **Pipeline Architecture**: The pipeline system can be extended with custom stages
@@ -248,10 +248,15 @@ if let format = FileSystemStrategyFactory.detectFormat(in: diskData) {
     
     // Create strategy and parse file system
     if let strategy = FileSystemStrategyFactory.createStrategy(for: format) {
-        let rootFolder = try await strategy.parse(diskData: diskData)
+        let rootFolder = try strategy.parse(diskData: diskData)
         // Navigate file system
-        for file in rootFolder.getFiles() {
-            print("File: \(file.name)")
+        for fileEntry in rootFolder.getFiles() {
+            print("File: \(fileEntry.name)")
+            // Access file data via chunk if available
+            if let chunk = try await fileEntry.toChunk(storage: chunkStorage) {
+                let data = try await chunk.readFull()
+                print("  Size: \(data.count) bytes")
+            }
         }
     }
 }

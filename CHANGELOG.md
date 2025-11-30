@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- **BREAKING**: Renamed `File` → `FileSystemEntry` to avoid naming conflicts
+  - `File` class renamed to `FileSystemEntry` (represents files only)
+  - `FileMetadata` struct renamed to `FileSystemEntryMetadata`
+  - Added `chunkIdentifier` property to `FileSystemEntry` for chunk-based storage
+  - Added `toChunk()` method to convert `FileSystemEntry` to `Chunk`
+  - Made `FileLocation` optional in `FileSystemEntryMetadata` (not all entries have disk image location)
+  - Updated `FileSystemStrategy` protocol to use `FileSystemEntry`
+  - Backward compatibility: Typealiases `File` → `FileSystemEntry` and `FileMetadata` → `FileSystemEntryMetadata` (deprecated)
+  - Clarified that `FileSystemEntry` represents files only; directories use `FileSystemFolder`
+
+### Added
+- **Core Types**: New reusable core types for common file system operations
+  - `SpecialFileType`: Special file detection (block devices, character devices, sockets, FIFOs)
+  - `DirectoryParser`: Reusable directory parsing with delegate pattern
+  - `FileMetadataCollector`: File system metadata collection utilities
+  - `PathUtilities`: Path manipulation utilities (normalize, relativePath, isSystemFile, isHidden)
+  - `FileTypeDetector`: File type detection (DMG, ISO, VHD, etc.)
+  - `FileCounter`: File counting utilities for directory trees
+- **Documentation**: Comprehensive architecture analysis documents
+  - `CHUNK_VS_FILE_ANALYSIS.md`: Analysis of Chunk vs FileSystemEntry architecture
+  - `NAMING_PROPOSAL.md`: Naming proposal for File → FileSystemEntry
+  - `FILESYSTEMENTRY_DIRECTORY_CLARIFICATION.md`: Clarification of FileSystemEntry vs FileSystemFolder
+
 ## [1.2.2] - 2025-11-30
 
 ### Added

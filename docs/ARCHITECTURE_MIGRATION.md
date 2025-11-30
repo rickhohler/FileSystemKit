@@ -11,7 +11,7 @@ FileSystemKit (Foundation)
 ├── Core Protocols
 │   ├── ChunkStorage (base protocol)
 │   ├── ChunkIdentifier, ChunkMetadata
-│   ├── FileSystemComponent, File, FileSystemFolder
+│   ├── FileSystemComponent, FileSystemEntry, FileSystemFolder
 │   ├── FileSystemStrategy (base protocol)
 │   └── RawDiskData, DiskImageHash, DiskImageMetadata
 ├── Core Implementations
@@ -94,7 +94,7 @@ public struct CloudKitDigitalAssetProvider: FSDigitalAssetProvider {
 1. **Core Types Moved to FileSystemKit:**
    - `ChunkStorage` protocol
    - `ChunkIdentifier`, `ChunkMetadata`
-   - `FileSystemComponent`, `File`, `FileSystemFolder`
+   - `FileSystemComponent`, `FileSystemEntry`, `FileSystemFolder`
    - `FileSystemStrategy` protocol
    - `RawDiskData`, `DiskImageHash`, `DiskImageMetadata`
    - `FileSystemError`

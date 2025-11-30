@@ -13,12 +13,17 @@
 // - Special file detection (block devices, character devices, sockets, FIFOs)
 // - Ignore pattern support
 // - Progress reporting
+//
+// Integration with FileSystemEntry:
+// - DirectoryEntry can be converted to FileSystemEntryMetadata using DirectoryEntry.toFileSystemEntryMetadata()
+// - Special file information is preserved in DirectoryEntry and can be transferred to FileSystemEntry
 
 import Foundation
 
 // MARK: - DirectoryEntry
 
 /// Represents a file system entry discovered during directory parsing
+/// Can be converted to FileSystemEntryMetadata for use with FileSystemEntry
 public struct DirectoryEntry: Sendable {
     /// Relative path from the root directory
     public let path: String
@@ -88,6 +93,94 @@ public struct DirectoryEntry: Sendable {
         self.isSystem = isSystem
         self.isSpecialFile = isSpecialFile
     }
+    
+    /// Convert this DirectoryEntry to FileSystemEntryMetadata for use with FileSystemEntry
+    /// - Returns: FileSystemEntryMetadata with information from this DirectoryEntry
+    /// - Note: Special file information is preserved in the specialFileType property
+    public func toFileSystemEntryMetadata() -> FileSystemEntryMetadata {
+        // Extract filename from path
+        let fileName = (path as NSString).lastPathComponent
+        
+        // Determine special file type string if this is a special file
+        let specialFileType: String?
+        if isSpecialFile {
+            // Map DirectoryEntry type to special file type string
+            switch type {
+            case "block-device":
+                specialFileType = "block-device"
+            case "character-device":
+                specialFileType = "character-device"
+            case "socket":
+                specialFileType = "socket"
+            case "fifo":
+                specialFileType = "fifo"
+            default:
+                specialFileType = type  // Use type as-is if it's already a special file type string
+            }
+        } else {
+            specialFileType = nil
+        }
+        
+        // Build attributes dictionary with additional metadata
+        var attributes: [String: Any] = [:]
+        if let permissions = permissions {
+            attributes["permissions"] = permissions
+        }
+        if let owner = owner {
+            attributes["owner"] = owner
+        }
+        if let group = group {
+            attributes["group"] = group
+        }
+        if let created = created {
+            attributes["created"] = created
+        }
+        if isHidden {
+            attributes["isHidden"] = true
+        }
+        if isSystem {
+            attributes["isSystem"] = true
+        }
+        if let symlinkTarget = symlinkTarget {
+            attributes["symlinkTarget"] = symlinkTarget
+        }
+        
+        return FileSystemEntryMetadata(
+            name: fileName,
+            size: size ?? 0,
+            modificationDate: modified,
+            fileType: nil,  // FileTypeCategory can be determined separately if needed
+            specialFileType: specialFileType,
+            attributes: attributes,
+            location: nil,  // DirectoryEntry doesn't have disk image location
+            hashes: [:]
+        )
+    }
+    
+    /// Convert this DirectoryEntry to a FileSystemEntry instance
+    /// - Parameter chunkIdentifier: Optional chunk identifier if file data is stored in ChunkStorage
+    /// - Returns: FileSystemEntry instance with metadata from this DirectoryEntry
+    /// - Note: For directories, this returns nil (use FileSystemFolder instead)
+    /// - Note: Special files are supported and will have specialFileType set in metadata
+    public func toFileSystemEntry(chunkIdentifier: ChunkIdentifier? = nil) -> FileSystemEntry? {
+        // Directories should use FileSystemFolder, not FileSystemEntry
+        guard type != "directory" else {
+            return nil
+        }
+        
+        let metadata = toFileSystemEntryMetadata()
+        return FileSystemEntry(metadata: metadata, chunkIdentifier: chunkIdentifier)
+    }
+    
+    /// Convert this DirectoryEntry to a FileSystemFolder instance
+    /// - Returns: FileSystemFolder instance if this is a directory, nil otherwise
+    public func toFileSystemFolder() -> FileSystemFolder? {
+        guard type == "directory" else {
+            return nil
+        }
+        
+        return FileSystemFolder(name: (path as NSString).lastPathComponent, modificationDate: modified)
+    }
 }
 
 // MARK: - DirectoryParserOptions
@@ -136,69 +229,68 @@ public struct DirectoryParserOptions: Sendable {
 
 // MARK: - DirectoryParserDelegate
 
-/// Delegate protocol for processing directory entries during parsing
+/// Delegate protocol for handling directory parsing events
 public protocol DirectoryParserDelegate: Sendable {
     /// Called when a directory entry is discovered
     /// - Parameter entry: The discovered directory entry
-    /// - Returns: True to continue parsing, false to skip this entry
+    /// - Returns: true to continue parsing, false to stop
+    /// - Throws: Error to abort parsing
     func processEntry(_ entry: DirectoryEntry) throws -> Bool
     
-    /// Called when an error occurs during parsing
-    /// - Parameters:
-    ///   - url: The URL that caused the error
-    ///   - error: The error that occurred
-    /// - Returns: True to continue parsing, false to stop
-    func handleError(url: URL, error: Error) -> Bool
+    /// Called when parsing starts
+    /// - Parameter rootURL: Root directory URL being parsed
+    func didStartParsing(rootURL: URL)
+    
+    /// Called when parsing completes
+    /// - Parameter rootURL: Root directory URL that was parsed
+    func didFinishParsing(rootURL: URL)
 }
 
 // MARK: - IgnoreMatcher
 
-/// Protocol for matching paths against ignore patterns
+/// Protocol for matching file paths against ignore patterns
 public protocol IgnoreMatcher: Sendable {
     /// Check if a path should be ignored
     /// - Parameter path: Relative path to check
-    /// - Returns: True if the path should be ignored
+    /// - Returns: true if path should be ignored, false otherwise
     func shouldIgnore(_ path: String) -> Bool
 }
 
 // MARK: - DirectoryParser
 
-/// Parses directories and discovers file system entries with metadata
-public class DirectoryParser {
-    private let options: DirectoryParserOptions
-    private let delegate: DirectoryParserDelegate
-    private let ignoreMatcher: IgnoreMatcher?
-    
-    /// Initialize a directory parser
+/// Reusable directory parser that walks directory trees and collects metadata
+/// Uses SpecialFileType from Core/SpecialFileType.swift for special file detection
+/// Uses FileMetadataCollector from Core/FileMetadata.swift for metadata collection
+/// Uses PathUtilities from Core/PathUtilities.swift for path normalization
+public struct DirectoryParser {
+    /// Parse a directory tree and report entries via delegate
     /// - Parameters:
+    ///   - rootURL: Root directory URL to parse
     ///   - options: Parsing options
-    ///   - delegate: Delegate to process discovered entries
+    ///   - delegate: Delegate to receive entry notifications
     ///   - ignoreMatcher: Optional ignore pattern matcher
-    public init(
-        options: DirectoryParserOptions,
+    /// - Throws: Errors encountered during parsing
+    public static func parse(
+        rootURL: URL,
+        options: DirectoryParserOptions = DirectoryParserOptions(),
         delegate: DirectoryParserDelegate,
         ignoreMatcher: IgnoreMatcher? = nil
-    ) {
-        self.options = options
-        self.delegate = delegate
-        self.ignoreMatcher = ignoreMatcher
-    }
-    
-    /// Parse a directory tree
-    /// - Parameter rootURL: Root directory URL to parse
-    /// - Throws: Errors encountered during parsing (if not handled by delegate)
-    public func parse(_ rootURL: URL) throws {
+    ) throws {
+        delegate.didStartParsing(rootURL: rootURL)
+        defer {
+            delegate.didFinishParsing(rootURL: rootURL)
+        }
+        
+        var visitedCanonicalPaths: Set<String> = []
         let resourceKeys: [URLResourceKey] = [
             .isDirectoryKey,
             .isSymbolicLinkKey,
             .isRegularFileKey,
-            .hasHiddenExtensionKey,
-            .isUserImmutableKey,
-            .isSystemImmutableKey,
             .fileSizeKey,
             .contentModificationDateKey,
             .creationDateKey,
-            .isExecutableKey
+            .hasHiddenExtensionKey,
+            .isSystemImmutableKey
         ]
         
         var enumeratorOptions: FileManager.DirectoryEnumerationOptions = []
@@ -210,9 +302,14 @@ public class DirectoryParser {
             at: rootURL,
             includingPropertiesForKeys: resourceKeys,
             options: enumeratorOptions,
-            errorHandler: { [weak self] (url, error) -> Bool in
-                guard let self = self else { return false }
-                return self.delegate.handleError(url: url, error: error)
+            errorHandler: { url, error in
+                if options.skipPermissionErrors {
+                    if options.verbose {
+                        print("  Warning: Skipping \(url.path) due to error: \(error.localizedDescription)")
+                    }
+                    return true
+                }
+                return false
             }
         )
         
@@ -220,32 +317,20 @@ public class DirectoryParser {
             throw DirectoryParserError.failedToEnumerate(rootURL)
         }
         
-        var visitedCanonicalPaths: Set<String> = []
-        
         for case let fileURL as URL in enumerator {
-            // Normalize path
             let relativePath = PathUtilities.relativePath(from: fileURL, baseURL: rootURL, basePath: options.basePath)
             
             // Check ignore patterns
             if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
-                if options.verbose {
-                    print("  Ignored: \(relativePath)")
-                }
                 continue
             }
             
             // Get resource values
-            let resourceValues: URLResourceValues
-            do {
-                resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
-            } catch {
+            guard let resourceValues = try? fileURL.resourceValues(forKeys: Set(resourceKeys)) else {
                 if options.skipPermissionErrors {
-                    if options.verbose {
-                        print("  Warning: Skipping \(relativePath) due to permission error: \(error.localizedDescription)")
-                    }
                     continue
                 }
-                throw error
+                throw DirectoryParserError.permissionDenied(fileURL)
             }
             
             let isDirectory = resourceValues.isDirectory ?? false
@@ -254,7 +339,7 @@ public class DirectoryParser {
             let isHidden = resourceValues.hasHiddenExtension ?? false
             let isSystem = resourceValues.isSystemImmutable ?? false
             
-            // Detect special files
+            // Detect special files using Core/SpecialFileType.swift
             let specialFileType = detectSpecialFileType(at: fileURL)
             
             // Handle symlinks
@@ -349,7 +434,7 @@ public class DirectoryParser {
                 continue
             }
             
-            // Handle special files
+            // Handle special files using Core/SpecialFileType.swift
             if let specialType = specialFileType {
                 if options.includeSpecialFiles {
                     let metadata = FileMetadataCollector.collect(from: fileURL)
@@ -442,6 +527,114 @@ public class DirectoryParser {
         }
     }
     
+    /// Parse a directory tree and build a FileSystemFolder hierarchy with FileSystemEntry instances
+    /// - Parameters:
+    ///   - rootURL: Root directory URL to parse
+    ///   - options: Parsing options
+    ///   - ignoreMatcher: Optional ignore pattern matcher
+    /// - Returns: Root FileSystemFolder containing parsed file system hierarchy
+    /// - Throws: Errors encountered during parsing
+    /// - Note: Special files are included if options.includeSpecialFiles is true
+    /// - Note: Files will have chunkIdentifier set to nil (can be set later when storing in ChunkStorage)
+    /// Parse a directory tree and build a FileSystemFolder hierarchy with FileSystemEntry instances
+    /// - Parameters:
+    ///   - rootURL: Root directory URL to parse
+    ///   - options: Parsing options
+    ///   - ignoreMatcher: Optional ignore pattern matcher
+    /// - Returns: Root FileSystemFolder containing parsed file system hierarchy
+    /// - Throws: Errors encountered during parsing
+    /// - Note: Special files are included if options.includeSpecialFiles is true
+    /// - Note: Files will have chunkIdentifier set to nil (can be set later when storing in ChunkStorage)
+    public static func parseToFileSystem(
+        rootURL: URL,
+        options: DirectoryParserOptions = DirectoryParserOptions(),
+        ignoreMatcher: IgnoreMatcher? = nil
+    ) throws -> FileSystemFolder {
+        let rootFolder = FileSystemFolder(name: rootURL.lastPathComponent, modificationDate: nil)
+        let folderMap = NSMutableDictionary()
+        folderMap[""] = rootFolder
+        
+        final class FileSystemBuilderDelegate: @unchecked Sendable, DirectoryParserDelegate {
+            let rootFolder: FileSystemFolder
+            let folderMap: NSMutableDictionary
+            let options: DirectoryParserOptions
+            
+            init(rootFolder: FileSystemFolder, folderMap: NSMutableDictionary, options: DirectoryParserOptions) {
+                self.rootFolder = rootFolder
+                self.folderMap = folderMap
+                self.options = options
+            }
+            
+            func processEntry(_ entry: DirectoryEntry) throws -> Bool {
+                // Get parent path
+                let pathComponents = entry.path.split(separator: "/").map(String.init)
+                let parentPath: String
+                if pathComponents.count > 1 {
+                    parentPath = pathComponents.dropLast().joined(separator: "/")
+                } else {
+                    parentPath = ""
+                }
+                
+                // Get or create parent folder
+                let parentFolder: FileSystemFolder
+                if let existingParent = folderMap[parentPath] as? FileSystemFolder {
+                    parentFolder = existingParent
+                } else {
+                    // Create missing parent folders
+                    var currentPath = ""
+                    var currentFolder = rootFolder
+                    
+                    for component in pathComponents.dropLast() {
+                        let nextPath = currentPath.isEmpty ? component : "\(currentPath)/\(component)"
+                        if let existingFolder = folderMap[nextPath] as? FileSystemFolder {
+                            currentFolder = existingFolder
+                        } else {
+                            let newFolder = FileSystemFolder(name: component, modificationDate: nil)
+                            currentFolder.addChild(newFolder)
+                            folderMap[nextPath] = newFolder
+                            currentFolder = newFolder
+                        }
+                        currentPath = nextPath
+                    }
+                    
+                    guard let finalParent = folderMap[parentPath] as? FileSystemFolder else {
+                        return true  // Skip if we can't create parent
+                    }
+                    parentFolder = finalParent
+                }
+                
+                // Add entry to parent folder
+                if entry.type == "directory" {
+                    if let folder = entry.toFileSystemFolder() {
+                        let entryPath = entry.path
+                        folderMap[entryPath] = folder
+                        parentFolder.addChild(folder)
+                    }
+                } else {
+                    // Regular file, symlink, or special file
+                    if let fileEntry = entry.toFileSystemEntry() {
+                        parentFolder.addChild(fileEntry)
+                    }
+                }
+                
+                return true
+            }
+            
+            func didStartParsing(rootURL: URL) {
+                // No-op
+            }
+            
+            func didFinishParsing(rootURL: URL) {
+                // No-op
+            }
+        }
+        
+        let delegate = FileSystemBuilderDelegate(rootFolder: rootFolder, folderMap: folderMap, options: options)
+        try parse(rootURL: rootURL, options: options, delegate: delegate, ignoreMatcher: ignoreMatcher)
+        
+        return rootFolder
+    }
+    
 }
 
 // MARK: - DirectoryParserError
@@ -463,4 +656,3 @@ public enum DirectoryParserError: Error, Sendable {
         }
     }
 }
-

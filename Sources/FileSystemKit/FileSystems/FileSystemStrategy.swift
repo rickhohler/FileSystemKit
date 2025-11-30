@@ -119,21 +119,21 @@ public protocol FileSystemStrategy {
     
     /// Read file content from raw disk data (on-demand loading) - Legacy method.
     /// - Parameters:
-    ///   - file: File object (with metadata and location)
+    ///   - file: FileSystemEntry object (with metadata and location)
     ///   - diskData: Raw disk data containing file content
     /// - Returns: File content as Data
     /// - Throws: Error if file cannot be read
     @available(*, deprecated, message: "Use readFile(_:chunkStorage:identifier:) instead")
-    func readFile(_ file: File, from diskData: RawDiskData) throws -> Data
+    func readFile(_ file: FileSystemEntry, from diskData: RawDiskData) throws -> Data
     
     /// Write file content to raw disk data - Legacy method.
     /// - Parameters:
     ///   - data: File content to write
-    ///   - file: File object (with metadata and location)
+    ///   - file: FileSystemEntry object (with metadata and location)
     ///   - diskData: Raw disk data to write to (modified in place)
     /// - Throws: Error if file cannot be written
     @available(*, deprecated, message: "Use writeFile(_:as:chunkStorage:identifier:) instead")
-    func writeFile(_ data: Data, as file: File, to diskData: inout RawDiskData) throws
+    func writeFile(_ data: Data, as file: FileSystemEntry, to diskData: inout RawDiskData) throws
     
     /// Create a new formatted disk image.
     /// - Parameter parameters: Format parameters

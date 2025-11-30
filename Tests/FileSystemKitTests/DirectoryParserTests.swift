@@ -36,8 +36,7 @@ final class DirectoryParserTests: XCTestCase {
             verbose: false
         )
         
-        let parser = DirectoryParser(options: options, delegate: delegate)
-        try parser.parse(tempDirectory)
+        try DirectoryParser.parse(rootURL: tempDirectory, options: options, delegate: delegate)
         
         XCTAssertEqual(entries.count, 0)
     }
@@ -59,8 +58,7 @@ final class DirectoryParserTests: XCTestCase {
             verbose: false
         )
         
-        let parser = DirectoryParser(options: options, delegate: delegate)
-        try parser.parse(tempDirectory)
+        try DirectoryParser.parse(rootURL: tempDirectory, options: options, delegate: delegate)
         
         // Get all entries as an array - DirectoryParser processes directories too
         let allEntries = entries.filter { _ in true }
@@ -102,8 +100,7 @@ final class DirectoryParserTests: XCTestCase {
             verbose: false
         )
         
-        let parser = DirectoryParser(options: options, delegate: delegate)
-        try parser.parse(tempDirectory)
+        try DirectoryParser.parse(rootURL: tempDirectory, options: options, delegate: delegate)
         
         // Should find directory, file in root, and file in subdir
         XCTAssertTrue(entries.count >= 3)
@@ -134,8 +131,7 @@ final class DirectoryParserTests: XCTestCase {
             verbose: false
         )
         
-        let parser = DirectoryParser(options: options, delegate: delegate, ignoreMatcher: ignoreMatcher)
-        try parser.parse(tempDirectory)
+        try DirectoryParser.parse(rootURL: tempDirectory, options: options, delegate: delegate, ignoreMatcher: ignoreMatcher)
         
         XCTAssertEqual(entries.count, 2)
         XCTAssertFalse(entries.contains { (entry: DirectoryEntry) in entry.path == "ignore.txt" })
@@ -155,8 +151,12 @@ final class DirectoryParserTests: XCTestCase {
             return true
         }
         
-        func handleError(url: URL, error: Error) -> Bool {
-            return true // Continue on error
+        func didStartParsing(rootURL: URL) {
+            // No-op for tests
+        }
+        
+        func didFinishParsing(rootURL: URL) {
+            // No-op for tests
         }
     }
     

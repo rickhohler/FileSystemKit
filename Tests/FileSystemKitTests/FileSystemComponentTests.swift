@@ -10,12 +10,12 @@ final class FileSystemComponentTests: XCTestCase {
     
     func testFileInitialization() {
         let location = FileLocation(offset: 0, length: 100)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "TESTFILE",
             size: 100,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         XCTAssertEqual(file.name, "TESTFILE")
         XCTAssertEqual(file.size, 100)
@@ -23,15 +23,15 @@ final class FileSystemComponentTests: XCTestCase {
         XCTAssertNil(file.parent)
     }
     
-    func testFileMetadataSeparation() {
+    func testFileSystemEntryMetadataSeparation() {
         // Verify metadata is separate from content
         let location = FileLocation(offset: 0, length: 50)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "METADATA_TEST",
             size: 50,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         // Metadata should be available immediately
         XCTAssertEqual(file.metadata.name, "METADATA_TEST")
@@ -44,12 +44,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testFileReadData() throws {
         let testData = Data([0x01, 0x02, 0x03, 0x04, 0x05])
         let location = FileLocation(offset: 0, length: testData.count)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "READ_TEST",
             size: testData.count,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         // Create raw disk data
         let rawDiskData = RawDiskData(rawData: testData)
@@ -64,12 +64,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testFileReadDataWithChunkStorage() async throws {
         let testData = Data([0x01, 0x02, 0x03, 0x04, 0x05])
         let location = FileLocation(offset: 0, length: testData.count)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "READ_TEST_CHUNK",
             size: testData.count,
             location: location
         )
-        _ = File(metadata: metadata)
+        _ = FileSystemEntry(metadata: metadata)
         
         // Create mock chunk storage
         let mockStorage = MockChunkStorage()
@@ -87,12 +87,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testFileHashGeneration() throws {
         let testData = Data("Hello, World!".utf8)
         let location = FileLocation(offset: 0, length: testData.count)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "HASH_TEST",
             size: testData.count,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         let rawDiskData = RawDiskData(rawData: testData)
         
@@ -100,9 +100,9 @@ final class FileSystemComponentTests: XCTestCase {
         _ = try file.readData(from: rawDiskData)
         
         // Generate hash (default: SHA-256)
-        let hash = try file.generateHash(algorithm: .sha256)
+        let hash = try file.generateHash(algorithm: HashAlgorithm.sha256)
         
-        XCTAssertEqual(hash.algorithm, .sha256)
+        XCTAssertEqual(hash.algorithm, HashAlgorithm.sha256)
         XCTAssertEqual(hash.value.count, 32) // SHA-256 produces 32 bytes
         XCTAssertFalse(hash.hexString.isEmpty)
         XCTAssertTrue(hash.identifier.hasPrefix("sha256:"))
@@ -110,12 +110,12 @@ final class FileSystemComponentTests: XCTestCase {
     
     func testFileTraverse() {
         let location = FileLocation(offset: 0, length: 10)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "TRAVERSE_TEST",
             size: 10,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         let components = file.traverse()
         XCTAssertEqual(components.count, 1)
@@ -137,12 +137,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testDirectoryAddChild() {
         let directory = FileSystemFolder(name: "PARENT")
         let location = FileLocation(offset: 0, length: 10)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "CHILD_FILE",
             size: 10,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         directory.addChild(file)
         
@@ -154,12 +154,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testDirectoryRemoveChild() {
         let directory = FileSystemFolder(name: "PARENT")
         let location = FileLocation(offset: 0, length: 10)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "CHILD_FILE",
             size: 10,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         directory.addChild(file)
         XCTAssertEqual(directory.children.count, 1)
@@ -172,12 +172,12 @@ final class FileSystemComponentTests: XCTestCase {
     func testDirectoryFindChild() {
         let directory = FileSystemFolder(name: "PARENT")
         let location = FileLocation(offset: 0, length: 10)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "CHILD_FILE",
             size: 10,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         directory.addChild(file)
         
@@ -198,21 +198,21 @@ final class FileSystemComponentTests: XCTestCase {
         
         // Add files
         let location1 = FileLocation(offset: 0, length: 100)
-        let metadata1 = FileMetadata(
+        let metadata1 = FileSystemEntryMetadata(
             name: "FILE1",
             size: 100,
             location: location1
         )
-        let file1 = File(metadata: metadata1)
+        let file1 = FileSystemEntry(metadata: metadata1)
         directory.addChild(file1)
         
         let location2 = FileLocation(offset: 0, length: 50)
-        let metadata2 = FileMetadata(
+        let metadata2 = FileSystemEntryMetadata(
             name: "FILE2",
             size: 50,
             location: location2
         )
-        let file2 = File(metadata: metadata2)
+        let file2 = FileSystemEntry(metadata: metadata2)
         directory.addChild(file2)
         
         // Directory size should be sum of children
@@ -223,12 +223,12 @@ final class FileSystemComponentTests: XCTestCase {
         let root = FileSystemFolder(name: "ROOT")
         let subdir = FileSystemFolder(name: "SUBDIR")
         let location = FileLocation(offset: 0, length: 10)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "FILE",
             size: 10,
             location: location
         )
-        let file = File(metadata: metadata)
+        let file = FileSystemEntry(metadata: metadata)
         
         root.addChild(subdir)
         subdir.addChild(file)
@@ -264,7 +264,7 @@ final class FileSystemComponentTests: XCTestCase {
     
     func testFileHash() {
         let data = Data([0x01, 0x02, 0x03])
-        let hash = FileHash(algorithm: .sha256, value: data)
+        let hash = FileHash(algorithm: HashAlgorithm.sha256, value: data)
         
         XCTAssertEqual(hash.algorithm, .sha256)
         XCTAssertEqual(hash.value, data)
@@ -274,23 +274,23 @@ final class FileSystemComponentTests: XCTestCase {
     
     func testFileHashEquality() {
         let data = Data([0x01, 0x02, 0x03])
-        let hash1 = FileHash(algorithm: .sha256, value: data)
-        let hash2 = FileHash(algorithm: .sha256, value: data)
-        let hash3 = FileHash(algorithm: .sha256, value: Data([0x04, 0x05, 0x06]))
+        let hash1 = FileHash(algorithm: HashAlgorithm.sha256, value: data)
+        let hash2 = FileHash(algorithm: HashAlgorithm.sha256, value: data)
+        let hash3 = FileHash(algorithm: HashAlgorithm.sha256, value: Data([0x04, 0x05, 0x06]))
         
         XCTAssertEqual(hash1, hash2)
         XCTAssertNotEqual(hash1, hash3)
     }
     
-    // MARK: - FileMetadata Tests
+    // MARK: - FileSystemEntryMetadata Tests
     
-    func testFileMetadata() {
+    func testFileSystemEntryMetadata() {
         let location = FileLocation(offset: 0, length: 100)
-        let metadata = FileMetadata(
+        let metadata = FileSystemEntryMetadata(
             name: "METADATA_TEST",
             size: 100,
             modificationDate: Date(),
-            fileType: .text,
+            fileType: FileTypeCategory.text,
             attributes: ["key": "value"],
             location: location
         )
@@ -298,7 +298,7 @@ final class FileSystemComponentTests: XCTestCase {
         XCTAssertEqual(metadata.name, "METADATA_TEST")
         XCTAssertEqual(metadata.size, 100)
         XCTAssertNotNil(metadata.modificationDate)
-        XCTAssertEqual(metadata.fileType, .text)
+        XCTAssertEqual(metadata.fileType, FileTypeCategory.text)
         XCTAssertEqual(metadata.attributes["key"] as? String, "value")
         XCTAssertEqual(metadata.location, location)
     }
