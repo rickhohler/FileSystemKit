@@ -224,9 +224,7 @@ public class DirectoryParser {
         
         for case let fileURL as URL in enumerator {
             // Normalize path
-            var relativePath = fileURL.path.replacingOccurrences(of: rootURL.path, with: options.basePath)
-                .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            relativePath = normalizePath(relativePath)
+            let relativePath = PathUtilities.relativePath(from: fileURL, baseURL: rootURL, basePath: options.basePath)
             
             // Check ignore patterns
             if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
@@ -265,20 +263,21 @@ public class DirectoryParser {
                     // Preserve symlink
                     do {
                         let symlinkTarget = try FileManager.default.destinationOfSymbolicLink(atPath: fileURL.path)
-                        let entry = DirectoryEntry(
-                            path: relativePath,
-                            url: fileURL,
-                            type: "symlink",
-                            symlinkTarget: symlinkTarget,
-                            permissions: getPermissions(from: fileURL),
-                            owner: getOwner(from: fileURL),
-                            group: getGroup(from: fileURL),
-                            modified: resourceValues.contentModificationDate,
-                            created: resourceValues.creationDate,
-                            isHidden: isHidden,
-                            isSystem: isSystem,
-                            isSpecialFile: false
-                        )
+                let metadata = FileMetadataCollector.collect(from: fileURL)
+                let entry = DirectoryEntry(
+                    path: relativePath,
+                    url: fileURL,
+                    type: "symlink",
+                    symlinkTarget: symlinkTarget,
+                    permissions: metadata.permissions,
+                    owner: metadata.owner,
+                    group: metadata.group,
+                    modified: metadata.modified ?? resourceValues.contentModificationDate,
+                    created: metadata.created ?? resourceValues.creationDate,
+                    isHidden: isHidden,
+                    isSystem: isSystem,
+                    isSpecialFile: false
+                )
                         
                         let shouldContinue = try delegate.processEntry(entry)
                         if !shouldContinue {
@@ -353,15 +352,16 @@ public class DirectoryParser {
             // Handle special files
             if let specialType = specialFileType {
                 if options.includeSpecialFiles {
+                    let metadata = FileMetadataCollector.collect(from: fileURL)
                     let entry = DirectoryEntry(
                         path: relativePath,
                         url: fileURL,
                         type: specialType.typeString ?? "unknown",
-                        permissions: getPermissions(from: fileURL),
-                        owner: getOwner(from: fileURL),
-                        group: getGroup(from: fileURL),
-                        modified: resourceValues.contentModificationDate,
-                        created: resourceValues.creationDate,
+                        permissions: metadata.permissions,
+                        owner: metadata.owner,
+                        group: metadata.group,
+                        modified: metadata.modified ?? resourceValues.contentModificationDate,
+                        created: metadata.created ?? resourceValues.creationDate,
                         isHidden: isHidden,
                         isSystem: isSystem,
                         isSpecialFile: true
@@ -385,15 +385,16 @@ public class DirectoryParser {
             
             // Handle directories
             if isDirectory {
+                let metadata = FileMetadataCollector.collect(from: fileURL)
                 let entry = DirectoryEntry(
                     path: relativePath,
                     url: fileURL,
                     type: "directory",
-                    permissions: getPermissions(from: fileURL),
-                    owner: getOwner(from: fileURL),
-                    group: getGroup(from: fileURL),
-                    modified: resourceValues.contentModificationDate,
-                    created: resourceValues.creationDate,
+                    permissions: metadata.permissions,
+                    owner: metadata.owner,
+                    group: metadata.group,
+                    modified: metadata.modified ?? resourceValues.contentModificationDate,
+                    created: metadata.created ?? resourceValues.creationDate,
                     isHidden: isHidden,
                     isSystem: isSystem,
                     isSpecialFile: false
@@ -412,17 +413,18 @@ public class DirectoryParser {
             
             // Handle regular files
             if isRegularFile {
-                let fileSize = resourceValues.fileSize ?? 0
+                let metadata = FileMetadataCollector.collect(from: fileURL)
+                let fileSize = metadata.size ?? resourceValues.fileSize ?? 0
                 let entry = DirectoryEntry(
                     path: relativePath,
                     url: fileURL,
                     type: "file",
                     size: fileSize,
-                    permissions: getPermissions(from: fileURL),
-                    owner: getOwner(from: fileURL),
-                    group: getGroup(from: fileURL),
-                    modified: resourceValues.contentModificationDate,
-                    created: resourceValues.creationDate,
+                    permissions: metadata.permissions,
+                    owner: metadata.owner,
+                    group: metadata.group,
+                    modified: metadata.modified ?? resourceValues.contentModificationDate,
+                    created: metadata.created ?? resourceValues.creationDate,
                     isHidden: isHidden,
                     isSystem: isSystem,
                     isSpecialFile: false
@@ -440,54 +442,6 @@ public class DirectoryParser {
         }
     }
     
-    // MARK: - Helper Methods
-    
-    private func normalizePath(_ path: String) -> String {
-        // Normalize path separators to forward slashes
-        return path.replacingOccurrences(of: "\\", with: "/")
-    }
-    
-    private func getPermissions(from url: URL) -> String? {
-        // Get file permissions using stat()
-        var statInfo = stat()
-        guard stat(url.path, &statInfo) == 0 else {
-            return nil
-        }
-        
-        // Convert to octal string
-        let mode = statInfo.st_mode & 0o7777
-        return String(format: "%04o", mode)
-    }
-    
-    private func getOwner(from url: URL) -> String? {
-        var statInfo = stat()
-        guard stat(url.path, &statInfo) == 0 else {
-            return nil
-        }
-        
-        // Get owner name (simplified - in production you might want to use getpwuid)
-        #if canImport(Darwin)
-        if let passwd = getpwuid(statInfo.st_uid) {
-            return String(cString: passwd.pointee.pw_name)
-        }
-        #endif
-        return nil
-    }
-    
-    private func getGroup(from url: URL) -> String? {
-        var statInfo = stat()
-        guard stat(url.path, &statInfo) == 0 else {
-            return nil
-        }
-        
-        // Get group name (simplified - in production you might want to use getgrgid)
-        #if canImport(Darwin)
-        if let group = getgrgid(statInfo.st_gid) {
-            return String(cString: group.pointee.gr_name)
-        }
-        #endif
-        return nil
-    }
 }
 
 // MARK: - DirectoryParserError

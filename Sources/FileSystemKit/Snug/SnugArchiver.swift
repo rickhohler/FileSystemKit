@@ -404,7 +404,7 @@ public class SnugArchiver {
             // Normalize path to Unix-style (handle Windows paths)
             var relativePath = fileURL.path.replacingOccurrences(of: url.path, with: basePath)
                 .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-            relativePath = normalizePath(relativePath)
+            // Path already normalized by PathUtilities.relativePath
             
             // Check ignore patterns
             if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
@@ -532,7 +532,7 @@ public class SnugArchiver {
                         let modifiedDate = try? resolvedURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                         
                         // Detect if this is a disk image file
-                        let (chunkType, contentType) = detectChunkType(for: resolvedURL, data: fileData)
+                        let typeInfo = FileTypeDetector.detect(for: resolvedURL, data: fileData)
                         
                         let metadata = ChunkMetadata(
                             size: fileData.count,
@@ -582,9 +582,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: getPermissions(from: resolvedURL),
-                            owner: getOwnerAndGroup(from: resolvedURL).owner,
-                            group: getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: FileMetadataCollector.getPermissions(from: resolvedURL),
+                            owner: FileMetadataCollector.getOwnerAndGroup(from: resolvedURL).owner,
+                            group: FileMetadataCollector.getOwnerAndGroup(from: resolvedURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: false,
@@ -689,20 +689,20 @@ public class SnugArchiver {
                     let hash = try hashCache.computeHashSync(for: fileURL, data: fileData, hashAlgorithm: hashAlgorithm)
                     
                     // Determine if this should be embedded (system files when embedSystemFiles is true)
-                    let shouldEmbed = embedSystemFiles && (isSystem || isHidden || isSystemFile(relativePath))
+                    let shouldEmbed = embedSystemFiles && (isSystem || isHidden || PathUtilities.isSystemFile(relativePath))
                     
                     if shouldEmbed {
                         // Embed file directly in archive
                         embeddedFiles.append((hash: hash, data: fileData, path: relativePath))
                         
-                        let (owner, group) = self.getOwnerAndGroup(from: fileURL)
+                        let (owner, group) = self.FileMetadataCollector.getOwnerAndGroup(from: fileURL)
                         let entry = ArchiveEntry(
                             type: "file",
                             path: relativePath,
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: self.getPermissions(from: fileURL),
+                            permissions: self.FileMetadataCollector.getPermissions(from: fileURL),
                             owner: owner,
                             group: group,
                             modified: resourceValues.contentModificationDate,
@@ -736,7 +736,7 @@ public class SnugArchiver {
                 let modifiedDate = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
                 
                 // Detect if this is a disk image file
-                let (chunkType, contentType) = detectChunkType(for: fileURL, data: fileData)
+                let typeInfo = FileTypeDetector.detect(for: fileURL, data: fileData)
                 
                 let metadata = ChunkMetadata(
                     size: fileData.count,
@@ -780,14 +780,14 @@ public class SnugArchiver {
                 }
                 
                 // File entry (hash storage)
-                let (owner, group) = self.getOwnerAndGroup(from: fileURL)
+                let (owner, group) = self.FileMetadataCollector.getOwnerAndGroup(from: fileURL)
                 let entry = ArchiveEntry(
                     type: "file",
                     path: relativePath,
                     hash: hash,
                     size: fileData.count,
                     target: nil,
-                    permissions: self.getPermissions(from: fileURL),
+                    permissions: self.FileMetadataCollector.getPermissions(from: fileURL),
                     owner: owner,
                     group: group,
                     modified: resourceValues.contentModificationDate,
@@ -841,18 +841,8 @@ public class SnugArchiver {
     }
     
     // Helper function to normalize paths (Windows to Unix-style)
-    private func normalizePath(_ path: String) -> String {
-        return path.replacingOccurrences(of: "\\", with: "/")
-            .replacingOccurrences(of: "//", with: "/")
-    }
     
     // Helper function to get permissions from file URL
-    private func getPermissions(from url: URL) -> String? {
-        do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            if let permissions = attributes[.posixPermissions] as? NSNumber {
-                return String(format: "%o", permissions.intValue)
-            }
         } catch {
             // Ignore errors - permissions are optional
         }
@@ -860,16 +850,6 @@ public class SnugArchiver {
     }
     
     // Helper function to get owner and group from file URL
-    private func getOwnerAndGroup(from url: URL) -> (owner: String?, group: String?) {
-        var owner: String? = nil
-        var group: String? = nil
-        
-        // Use FileManager to get owner/group
-        do {
-            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
-            if let ownerName = attributes[.ownerAccountName] as? String {
-                owner = ownerName
-            }
             if let groupName = attributes[.groupOwnerAccountName] as? String {
                 group = groupName
             }
@@ -881,17 +861,6 @@ public class SnugArchiver {
     }
     
     // Helper function to detect system files
-    private func isSystemFile(_ path: String) -> Bool {
-        let systemPaths = [
-            "System Volume Information",
-            "$RECYCLE.BIN",
-            "System32",
-            "Windows",
-            ".Trash",
-            ".DS_Store"
-        ]
-        return systemPaths.contains { path.contains($0) }
-    }
     
     private func computeHash(data: Data) throws -> String {
         switch hashAlgorithm.lowercased() {
@@ -1004,20 +973,6 @@ extension SnugArchiver {
     ///   - url: File URL
     ///   - data: File data (may be partial for detection)
     /// - Returns: Tuple of (chunkType, contentType)
-    func detectChunkType(for url: URL, data: Data) -> (chunkType: String, contentType: String?) {
-        let fileExtension = url.pathExtension.lowercased()
-        
-        // Check for disk image formats using file extension and magic numbers
-        // This matches the detection logic used by DiskImageAdapter implementations
-        
-        // DMG (Mac disk image)
-        if fileExtension == "dmg" {
-            // Check for UDIF signature at end of file
-            if data.count >= 512 {
-                let trailerData = data.subdata(in: (data.count - 512)..<data.count)
-                if trailerData[0..<4] == Data([0x6B, 0x6F, 0x6C, 0x79]) { // "koly" UDIF signature
-                    return ("disk-image", "application/x-apple-diskimage")
-                }
             }
         }
         
