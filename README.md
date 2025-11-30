@@ -46,6 +46,7 @@ FileSystemKit implements a three-layer architecture:
 - StuffIt (.sit, .sitx)
 - ShrinkIt (.shk, .sdk)
 - Archive.org (.archiveorg) - Directory structures containing disk images
+- SNUG (.snug) - Content-addressable archive format
 
 ### File System Formats (Layer 3)
 - ISO 9660 (CD-ROM/DVD-ROM file systems)
