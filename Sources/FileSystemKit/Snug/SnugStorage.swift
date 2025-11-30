@@ -77,21 +77,25 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
         // Write or update metadata file (always update to track all original paths)
         if let metadata = metadata {
             let metadataURL = url.appendingPathExtension("meta")
-            let isNewMetadataFile = !FileManager.default.fileExists(atPath: metadataURL.path)
-            try writeMetadata(metadata, to: metadataURL, identifier: identifier, isNewFile: isNewMetadataFile)
+            try writeMetadata(metadata, to: metadataURL, identifier: identifier)
         }
         
         return identifier
     }
     
     /// Write metadata to file (JSON format)
-    private func writeMetadata(_ metadata: ChunkMetadata, to url: URL, identifier: ChunkIdentifier, isNewFile: Bool) throws {
+    private func writeMetadata(_ metadata: ChunkMetadata, to url: URL, identifier: ChunkIdentifier) throws {
         // If metadata file exists, read existing metadata to merge original paths
         var finalMetadata = metadata
         
         // Always try to read existing metadata if file exists (for merging)
-        if FileManager.default.fileExists(atPath: url.path), let existingData = try? Data(contentsOf: url) {
-            if let existingMetadata = try? JSONDecoder().decode(ChunkMetadata.self, from: existingData) {
+        let fileExists = FileManager.default.fileExists(atPath: url.path)
+        if fileExists {
+            do {
+                let existingData = try Data(contentsOf: url)
+                let decoder = JSONDecoder()
+                decoder.dateDecodingStrategy = .iso8601
+                let existingMetadata = try decoder.decode(ChunkMetadata.self, from: existingData)
                 // Merge original paths
                 var mergedPaths = Set(existingMetadata.originalPaths ?? [])
                 if let originalFilename = existingMetadata.originalFilename {
@@ -120,15 +124,18 @@ public struct SnugFileSystemChunkStorage: ChunkStorage, Sendable {
                     modified: latestModified ?? existingMetadata.modified ?? metadata.modified,
                     compression: existingMetadata.compression ?? metadata.compression  // Prefer existing (first write)
                 )
+            } catch {
+                // If we can't read/decode existing metadata, just use new metadata
+                // This shouldn't happen in normal operation, but handle gracefully
             }
         }
         
-        // Write metadata as JSON
+        // Write metadata as JSON (atomically to ensure file is fully written)
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
         let metadataData = try encoder.encode(finalMetadata)
-        try metadataData.write(to: url)
+        try metadataData.write(to: url, options: [.atomic])
     }
     
     /// Read metadata from file
