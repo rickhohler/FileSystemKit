@@ -237,17 +237,23 @@ final class SnugMirroredStorageTests: XCTestCase {
         _ = try await glacierStorage.writeChunk(testData, identifier: identifier, metadata: nil)
         
         // Verify all have the data
-        XCTAssertNotNil(try await primaryStorage.readChunk(identifier))
-        XCTAssertNotNil(try await mirrorStorage.readChunk(identifier))
-        XCTAssertNotNil(try await glacierStorage.readChunk(identifier))
+        let primaryChunk = try await primaryStorage.readChunk(identifier)
+        let mirrorChunk = try await mirrorStorage.readChunk(identifier)
+        let glacierChunk = try await glacierStorage.readChunk(identifier)
+        XCTAssertNotNil(primaryChunk)
+        XCTAssertNotNil(mirrorChunk)
+        XCTAssertNotNil(glacierChunk)
         
         // Delete from mirrored storage
         try await mirroredStorage.deleteChunk(identifier)
         
         // Verify all are deleted
-        XCTAssertNil(try await primaryStorage.readChunk(identifier))
-        XCTAssertNil(try await mirrorStorage.readChunk(identifier))
-        XCTAssertNil(try await glacierStorage.readChunk(identifier))
+        let primaryResult = try await primaryStorage.readChunk(identifier)
+        let mirrorResult = try await mirrorStorage.readChunk(identifier)
+        let glacierResult = try await glacierStorage.readChunk(identifier)
+        XCTAssertNil(primaryResult)
+        XCTAssertNil(mirrorResult)
+        XCTAssertNil(glacierResult)
     }
     
     // MARK: - Existence Checks Tests
@@ -306,7 +312,7 @@ final class SnugMirroredStorageTests: XCTestCase {
                         contentHash: "concurrent\(i)",
                         hashAlgorithm: "sha256"
                     )
-                    try? await mirroredStorage.writeChunk(testData, identifier: identifier, metadata: metadata)
+                    _ = try? await mirroredStorage.writeChunk(testData, identifier: identifier, metadata: metadata)
                 }
             }
         }
@@ -314,9 +320,12 @@ final class SnugMirroredStorageTests: XCTestCase {
         // Verify all chunks exist in all storages
         for i in 0..<10 {
             let identifier = ChunkIdentifier(id: "concurrent\(i)")
-            XCTAssertTrue(try await primaryStorage.chunkExists(identifier))
-            XCTAssertTrue(try await mirrorStorage.chunkExists(identifier))
-            XCTAssertTrue(try await glacierStorage.chunkExists(identifier))
+            let primaryExists = try await primaryStorage.chunkExists(identifier)
+            let mirrorExists = try await mirrorStorage.chunkExists(identifier)
+            let glacierExists = try await glacierStorage.chunkExists(identifier)
+            XCTAssertTrue(primaryExists)
+            XCTAssertTrue(mirrorExists)
+            XCTAssertTrue(glacierExists)
         }
     }
 }

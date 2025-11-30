@@ -332,7 +332,7 @@ public class SnugArchiver {
             .isRegularFileKey,
             .hasHiddenExtensionKey,
             .isUserImmutableKey,
-            .capturedIsSystemImmutableKey,
+            .isSystemImmutableKey,
             .fileSizeKey,
             .contentModificationDateKey,
             .creationDateKey,
@@ -380,12 +380,15 @@ public class SnugArchiver {
             let isDirectory = resourceValues.isDirectory ?? false
             let isSymlink = resourceValues.isSymbolicLink ?? false
             let isRegularFile = resourceValues.isRegularFile ?? false
+            // Check for special files using stat() since URLResourceValues doesn't provide these
             // Check for special files - URLResourceValues doesn't provide these properties
             // We'll detect them by attempting to read the file instead
             let isBlockDevice = false  // Would need stat() to detect
             let isCharacterDevice = false  // Would need stat() to detect
             let isSocket = false  // Would need stat() to detect
             let isFIFO = false  // Would need stat() to detect
+            let isHidden = resourceValues.hasHiddenExtension ?? false
+            let isSystem = resourceValues.isSystemImmutable ?? false
             
             // Handle symlinks
             if isSymlink {
@@ -541,9 +544,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: self.getPermissions(from: resolvedURL),
-                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
-                            group: self.getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: getPermissions(from: resolvedURL),
+                            owner: getOwnerAndGroup(from: resolvedURL).owner,
+                            group: getOwnerAndGroup(from: resolvedURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: false,
@@ -645,7 +648,7 @@ public class SnugArchiver {
                     let hash = try computeHash(data: fileData)
                     
                     // Determine if this should be embedded (system files when embedSystemFiles is true)
-                    let shouldEmbed = embedSystemFiles && (capturedIsSystem || capturedIsHidden || capturedIsSystemFile(relativePath))
+                    let shouldEmbed = embedSystemFiles && (isSystem || isHidden || isSystemFile(relativePath))
                     
                     if shouldEmbed {
                         // Embed file directly in archive
@@ -657,9 +660,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: self.getPermissions(from: fileURL),
-                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
-                            group: self.getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: getPermissions(from: fileURL),
+                            owner: getOwnerAndGroup(from: fileURL).owner,
+                            group: getOwnerAndGroup(from: fileURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: true,
@@ -738,9 +741,9 @@ public class SnugArchiver {
                             hash: hash,
                             size: fileData.count,
                             target: nil,
-                            permissions: self.getPermissions(from: fileURL),
-                            owner: self.getOwnerAndGroup(from: resolvedURL).owner,
-                            group: self.getOwnerAndGroup(from: resolvedURL).group,
+                            permissions: getPermissions(from: fileURL),
+                            owner: getOwnerAndGroup(from: fileURL).owner,
+                            group: getOwnerAndGroup(from: fileURL).group,
                             modified: resourceValues.contentModificationDate,
                             created: resourceValues.creationDate,
                             embedded: false,
@@ -797,9 +800,42 @@ public class SnugArchiver {
             .replacingOccurrences(of: "//", with: "/")
     }
     
+    // Helper function to get permissions from file URL
+    private func getPermissions(from url: URL) -> String? {
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let permissions = attributes[.posixPermissions] as? NSNumber {
+                return String(format: "%o", permissions.intValue)
+            }
+        } catch {
+            // Ignore errors - permissions are optional
+        }
+        return nil
+    }
+    
+    // Helper function to get owner and group from file URL
+    private func getOwnerAndGroup(from url: URL) -> (owner: String?, group: String?) {
+        var owner: String? = nil
+        var group: String? = nil
+        
+        // Use FileManager to get owner/group
+        do {
+            let attributes = try FileManager.default.attributesOfItem(atPath: url.path)
+            if let ownerName = attributes[.ownerAccountName] as? String {
+                owner = ownerName
+            }
+            if let groupName = attributes[.groupOwnerAccountName] as? String {
+                group = groupName
+            }
+        } catch {
+            // Ignore errors - owner/group are optional
+        }
+        
+        return (owner, group)
+    }
     
     // Helper function to detect system files
-    private func capturedIsSystemFile(_ path: String) -> Bool {
+    private func isSystemFile(_ path: String) -> Bool {
         let systemPaths = [
             "System Volume Information",
             "$RECYCLE.BIN",

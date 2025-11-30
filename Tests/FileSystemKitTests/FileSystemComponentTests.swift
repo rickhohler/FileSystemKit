@@ -69,7 +69,7 @@ final class FileSystemComponentTests: XCTestCase {
             size: testData.count,
             location: location
         )
-        let file = File(metadata: metadata)
+        _ = File(metadata: metadata)
         
         // Create mock chunk storage
         let mockStorage = MockChunkStorage()

@@ -144,6 +144,12 @@ public struct SnugMirroredChunkStorage: ChunkStorage, Sendable {
                     try? await mirrorStorage.deleteChunk(identifier)
                 }
             }
+            // Delete from glacier storages
+            for glacierStorage in glacierStorages {
+                group.addTask {
+                    try? await glacierStorage.deleteChunk(identifier)
+                }
+            }
         }
     }
     
