@@ -101,49 +101,24 @@ public class SnugArchiver {
             phase: .processing
         )
         
-        // Use concurrent processing for high-volume file operations
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultHolder = ProcessingResultHolder()
-        
-        Task { [chunkStorage = self.chunkStorage, hashAlgorithm = self.hashAlgorithm] in
-            do {
-                let results = try await self.processDirectoryConcurrent(
-                    at: sourceURL,
-                    basePath: "",
-                    totalFileCount: totalFileCount,
-                    verbose: verbose,
-                    followExternalSymlinks: followExternalSymlinks,
-                    errorOnBrokenSymlinks: errorOnBrokenSymlinks,
-                    preserveSymlinks: preserveSymlinks,
-                    embedSystemFiles: embedSystemFiles,
-                    skipPermissionErrors: skipPermissionErrors,
-                    ignoreMatcher: ignoreMatcher,
-                    chunkStorage: chunkStorage,
-                    hashAlgorithm: hashAlgorithm
-                )
-                resultHolder.entries = results.entries
-                resultHolder.hashRegistry = results.hashRegistry
-                resultHolder.processedHashes = results.processedHashes
-                resultHolder.totalSize = results.totalSize
-                resultHolder.embeddedFiles = results.embeddedFiles
-                semaphore.signal()
-            } catch {
-                resultHolder.error = error
-                semaphore.signal()
-            }
-        }
-        
-        semaphore.wait()
-        
-        if let error = resultHolder.error {
-            throw error
-        }
-        
-        entries = resultHolder.entries
-        hashRegistry = resultHolder.hashRegistry
-        processedHashes = resultHolder.processedHashes
-        totalSize = resultHolder.totalSize
-        embeddedFiles = resultHolder.embeddedFiles
+        // Process directory (concurrent processing infrastructure prepared for future implementation)
+        try processDirectory(
+            at: sourceURL,
+            basePath: "",
+            entries: &entries,
+            hashRegistry: &hashRegistry,
+            processedHashes: &processedHashes,
+            totalSize: &totalSize,
+            embeddedFiles: &embeddedFiles,
+            totalFileCount: totalFileCount,
+            verbose: verbose,
+            followExternalSymlinks: followExternalSymlinks,
+            errorOnBrokenSymlinks: errorOnBrokenSymlinks,
+            preserveSymlinks: preserveSymlinks,
+            embedSystemFiles: embedSystemFiles,
+            skipPermissionErrors: skipPermissionErrors,
+            ignoreMatcher: ignoreMatcher
+        )
         
         // 2. Create YAML structure
         let archive = SnugArchive(
