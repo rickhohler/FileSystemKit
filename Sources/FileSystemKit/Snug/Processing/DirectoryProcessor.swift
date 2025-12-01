@@ -158,16 +158,10 @@ internal struct DirectoryProcessor {
             if let specialInfo = specialFileInfo {
                 if embedSystemFiles {
                     // Store special file metadata entry
-                    guard let specialType = specialInfo.typeString else {
-                        // This shouldn't happen, but handle gracefully
-                        if verbose {
-                            print("  Warning: Unknown special file type: \(relativePath)")
-                        }
-                        continue
-                    }
-                    
+                    // Use "special" as the type for all special files (FIFO, socket, block-device, character-device)
+                    // The specific type information is preserved in the entry's metadata if needed
                     let entry = ArchiveEntry(
-                        type: specialType,
+                        type: "special",
                         path: relativePath,
                         hash: nil,
                         size: nil,
@@ -183,6 +177,7 @@ internal struct DirectoryProcessor {
                     entries.append(entry)
                     
                     if verbose {
+                        let specialType = specialInfo.typeString ?? "unknown"
                         print("  Added special file (\(specialType)): \(relativePath)")
                     }
                 } else {
