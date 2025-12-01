@@ -33,6 +33,12 @@ public struct PipelineContext: @unchecked Sendable {
     /// Raw disk data (if extracted)
     public var rawDiskData: RawDiskData?
     
+    /// Chunk storage for reading file contents (if available)
+    public var chunkStorage: (any ChunkStorage)?
+    
+    /// Chunk identifier for the disk image data (if available)
+    public var chunkIdentifier: ChunkIdentifier?
+    
     /// Parsed file system folder structure
     public var fileSystemFolder: FileSystemFolder?
     

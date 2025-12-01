@@ -44,10 +44,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `FileTypeDetectorTests`: Tests for file type detection
   - `PathUtilitiesTests`: Tests for path utilities
 - **Documentation**: Comprehensive architecture analysis documents
-  - `CHUNK_VS_FILE_ANALYSIS.md`: Analysis of Chunk vs FileSystemEntry architecture
-  - `NAMING_PROPOSAL.md`: Naming proposal for File → FileSystemEntry
-  - `FILESYSTEMENTRY_DIRECTORY_CLARIFICATION.md`: Clarification of FileSystemEntry vs FileSystemFolder
-  - `FILESYSTEMENTRY_DATA_SOURCES.md`: Documentation on FileSystemEntry supporting physical files and data streams
+  - `docs/CHUNK_VS_FILE_ANALYSIS.md`: Analysis of Chunk vs FileSystemEntry architecture
+  - `docs/NAMING_PROPOSAL.md`: Naming proposal for File → FileSystemEntry
+  - `docs/FILESYSTEMENTRY_DIRECTORY_CLARIFICATION.md`: Clarification of FileSystemEntry vs FileSystemFolder
+  - `docs/FILESYSTEMENTRY_DATA_SOURCES.md`: Documentation on FileSystemEntry supporting physical files and data streams
 
 ### Fixed
 - Fixed all compiler warnings and errors across all projects
