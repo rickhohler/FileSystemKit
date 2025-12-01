@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.2] - 2025-12-01
+
+### Added
+- Added `chunkStorage` and `chunkIdentifier` fields to `PipelineContext` to support the new `readFile(_:chunkStorage:identifier:)` API
+- These fields enable stages like `GrepStage` to use the non-deprecated file reading method
+
 ## [1.3.1] - 2025-12-01
 
 ### Fixed
