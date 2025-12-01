@@ -11,7 +11,9 @@ import Foundation
 import Yams
 
 /// Creates SNUG archives from directory structures
-public class SnugArchiver {
+/// Internal implementation of archive creation
+/// Note: Clients should use FileSystemKitArchiveFacade instead for stable API contract
+internal class SnugArchiver {
     let storageURL: URL
     let hashAlgorithm: String
     let chunkStorage: any ChunkStorage

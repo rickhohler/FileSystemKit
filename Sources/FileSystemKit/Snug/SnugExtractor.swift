@@ -4,7 +4,9 @@
 import Foundation
 
 /// Extracts files from SNUG archives
-public class SnugExtractor {
+/// Internal implementation of archive extraction
+/// Note: Clients should use FileSystemKitArchiveFacade instead for stable API contract
+internal class SnugExtractor {
     let storageURL: URL
     let chunkStorage: any ChunkStorage
     

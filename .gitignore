@@ -85,3 +85,7 @@ coverage-html/
 # Temporary files
 tmp/
 *.tmp
+
+# DocC-generated documentation (design docs in docs/ directory should be committed)
+Documentation/
+*.doccarchive

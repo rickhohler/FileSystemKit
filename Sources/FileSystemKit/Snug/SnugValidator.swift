@@ -4,7 +4,9 @@
 import Foundation
 
 /// Validates SNUG archives
-public class SnugValidator {
+/// Internal implementation of archive validation
+/// Note: Clients should use FileSystemKitArchiveFacade instead for stable API contract
+internal class SnugValidator {
     let storageURL: URL
     let chunkStorage: SnugFileSystemChunkStorage
     

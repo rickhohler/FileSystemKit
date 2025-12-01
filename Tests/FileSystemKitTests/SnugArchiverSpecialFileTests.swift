@@ -32,9 +32,9 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: false
         )
         
-        // Parse archive to check entries
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Load archive metadata to check entries using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // Regular file should be included
         let regularFileEntry = archive.entries.first { $0.path == "regular.txt" }
@@ -74,9 +74,9 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: false
         )
         
-        // Parse archive to check entries
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Load archive metadata to check entries using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // FIFO should NOT be included when embedSystemFiles is false
         let fifoEntry = archive.entries.first { $0.path == "test_fifo" }
@@ -111,9 +111,9 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: true
         )
         
-        // Parse archive to check entries
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Load archive metadata to check entries using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // FIFO should be included when embedSystemFiles is true
         let fifoEntry = archive.entries.first { $0.path == "test_fifo" }
@@ -148,9 +148,9 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: true
         )
         
-        // Parse archive to check metadata
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Parse archive to check metadata using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         let fifoEntry = archive.entries.first { $0.path == "test_fifo" }
         XCTAssertNotNil(fifoEntry, "FIFO should be included")
@@ -197,8 +197,8 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: true
         )
         
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // Both FIFOs should be included
         let fifo1Entry = archive.entries.first { $0.path == "fifo1" }
@@ -237,8 +237,8 @@ final class SnugArchiverSpecialFileTests: SnugArchiverTestBase {
             embedSystemFiles: true
         )
         
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // Both should be included
         let regularEntry = archive.entries.first { $0.path == "regular.txt" }

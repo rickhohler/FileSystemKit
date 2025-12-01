@@ -30,9 +30,9 @@ final class SnugArchiverMetadataTests: SnugArchiverTestBase {
         
         XCTAssertGreaterThan(stats.fileCount, 0)
         
-        // Verify metadata structure matches ChunkMetadata
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Verify metadata structure matches ChunkMetadata using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         let fileEntry = archive.entries.first { $0.path.contains("test.txt") }
         
         if let hash = fileEntry?.hash {

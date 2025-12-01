@@ -8,10 +8,11 @@ import Compression
 #endif
 
 /// Parses SNUG archives from compressed YAML files
-public class SnugParser {
-    public init() {}
+/// Internal implementation - clients should use FileSystemKitArchiveFacade.parseArchive instead
+internal class SnugParser {
+    internal init() {}
     
-    public func parseArchive(from archiveURL: URL) throws -> SnugArchive {
+    internal func parseArchive(from archiveURL: URL) throws -> SnugArchive {
         // 1. Read compressed data
         let compressedData = try Data(contentsOf: archiveURL)
         

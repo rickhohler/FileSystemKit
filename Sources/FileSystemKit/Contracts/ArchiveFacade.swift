@@ -7,14 +7,38 @@ import Foundation
 
 /// Facade implementation of ArchiveContract
 /// Provides stable API while internal implementation can evolve
+///
+/// Use this facade to interact with Snug archives. The facade provides a stable API contract
+/// that remains consistent even as the internal implementation evolves.
+///
+/// - Example:
+///   ```swift
+///   let storageURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+///   let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+///   let result = try await facade.createArchive(
+///       from: sourceDirectory,
+///       outputURL: archiveURL,
+///       options: .default
+///   )
+///   ```
 public struct FileSystemKitArchiveFacade: ArchiveContract {
     private let storageURL: URL
     private let hashAlgorithm: String
     
-    /// Initialize facade with storage configuration
+    /// Creates a facade instance with storage configuration.
+    ///
     /// - Parameters:
-    ///   - storageURL: Storage directory URL
-    ///   - hashAlgorithm: Hash algorithm to use
+    ///   - storageURL: Storage directory URL where archive content chunks will be stored.
+    ///                 This should be a persistent directory that will remain available
+    ///                 for the lifetime of archives created with this facade.
+    ///   - hashAlgorithm: Hash algorithm to use for content-addressable storage.
+    ///                    Supported values: `"sha256"` (default, recommended), `"sha1"`, `"md5"`.
+    ///                    The algorithm must match when creating and extracting archives.
+    /// - Example:
+    ///   ```swift
+    ///   let storageURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+    ///   let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+    ///   ```
     public init(storageURL: URL, hashAlgorithm: String = "sha256") {
         self.storageURL = storageURL
         self.hashAlgorithm = hashAlgorithm
@@ -31,16 +55,19 @@ public struct FileSystemKitArchiveFacade: ArchiveContract {
             hashAlgorithm: options.hashAlgorithm.isEmpty ? hashAlgorithm : options.hashAlgorithm
         )
         
+        // Build ignore matcher from patterns
+        let ignoreMatcher: SnugIgnoreMatcher? = options.ignorePatterns.isEmpty ? nil : SnugIgnoreMatcher(patterns: options.ignorePatterns)
+        
         let stats = try await archiver.createArchive(
             from: sourceURL,
             outputURL: outputURL,
             verbose: options.verbose,
             followExternalSymlinks: options.followSymlinks,
-            errorOnBrokenSymlinks: false,
+            errorOnBrokenSymlinks: options.errorOnBrokenSymlinks,
             preserveSymlinks: options.preserveSymlinks,
             embedSystemFiles: options.embedSystemFiles,
             skipPermissionErrors: options.skipPermissionErrors,
-            ignoreMatcher: nil
+            ignoreMatcher: ignoreMatcher
         )
         
         return ArchiveResult(
@@ -87,7 +114,7 @@ public struct FileSystemKitArchiveFacade: ArchiveContract {
     }
     
     public func validateArchive(
-        _ archiveURL: URL,
+        at archiveURL: URL,
         options: ValidateOptions
     ) async throws -> ValidationResult {
         // Delegate to internal implementation
@@ -106,8 +133,8 @@ public struct FileSystemKitArchiveFacade: ArchiveContract {
         )
     }
     
-    public func listArchive(
-        _ archiveURL: URL,
+    public func contents(
+        of archiveURL: URL,
         options: ListOptions
     ) async throws -> ArchiveListing {
         // Delegate to internal implementation
@@ -130,6 +157,12 @@ public struct FileSystemKitArchiveFacade: ArchiveContract {
             totalFiles: entries.filter { $0.type == "file" }.count,
             totalSize: totalSize
         )
+    }
+    
+    public func loadMetadata(from archiveURL: URL) throws -> SnugArchive {
+        // Delegate to internal implementation
+        let parser = SnugParser()
+        return try parser.parseArchive(from: archiveURL)
     }
 }
 

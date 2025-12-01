@@ -7,6 +7,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2025-12-01
+
+### Added
+- **DocC Documentation Support**: Added Swift DocC documentation generation
+  - Created `Documentation.docc/` catalog with overview and getting started guide
+  - Added `scripts/generate-docs.sh` for automated documentation generation
+  - Documentation generated to `Documentation/` directory (gitignored)
+- **API Protocol Extensions**: Added convenience methods via protocol extensions
+  - `createArchive(from:outputURL:)` - Convenience method with default options
+  - `extractArchive(from:to:)` - Convenience method with default options
+  - `validateArchive(at:)` - Convenience method with default options
+  - `contents(of:)` - Convenience method with default options
+- **Type Conformance Enhancements**: Added protocol conformance to result types
+  - `ArchiveResult`, `ExtractResult`, `ValidationResult` now conform to `CustomStringConvertible`
+  - `ArchiveListing` and `ArchiveListingEntry` now conform to `CustomStringConvertible`
+- **Static Convenience Properties**: Added static properties for common option configurations
+  - `ArchiveOptions.default`, `.verbose`, `.minimal`
+  - `ExtractOptions.default`, `.preservePermissions`, `.overwrite`
+  - `ValidateOptions.default`, `.strict`, `.quick`
+  - `ListOptions.default`, `.detailed`, `.summary`
+
+### Changed
+- **API Method Naming**: Improved method names to align with Apple API Design Guidelines
+  - `listArchive(_:options:)` → `contents(of:options:)` (aligns with `FileManager.contentsOfDirectory(at:)`)
+  - `parseArchive(_:)` → `loadMetadata(from:)` (clearer intent)
+  - `validateArchive(_:options:)` → `validateArchive(at:options:)` (better parameter labeling)
+- **Enhanced Documentation**: Comprehensive API documentation improvements
+  - Added detailed error documentation specifying exact error types and conditions
+  - Enhanced parameter and return type documentation
+  - Added usage examples to all public methods
+  - Improved documentation formatting and clarity
+- **Discardable Results**: Added `@discardableResult` to `createArchive` and `extractArchive` methods
+
+### Fixed
+- Updated all internal implementations to use new method names
+- Updated test files to use new API method names
+- Fixed method call sites in `ArchiveFacade` implementation
+
 ## [1.4.0] - 2025-12-01
 
 ### Added

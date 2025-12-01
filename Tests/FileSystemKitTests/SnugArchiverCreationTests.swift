@@ -60,9 +60,9 @@ final class SnugArchiverCreationTests: SnugArchiverTestBase {
         XCTAssertGreaterThan(stats.fileCount, 0)
         
         // Verify that the chunk was stored with disk-image type
-        // Read the archive and check metadata
-        let parser = SnugParser()
-        let archive = try parser.parseArchive(from: outputURL)
+        // Read the archive and check metadata using facade
+        let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+        let archive = try facade.loadMetadata(from: outputURL)
         
         // Find the DMG file entry
         let dmgEntry = archive.entries.first { $0.path.contains("test.dmg") }
