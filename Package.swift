@@ -23,10 +23,6 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.1.2"),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.0.0"),
-    ],
-    plugins: [
-        .plugin(name: "Swift-DocC", package: "swift-docc-plugin")
     ],
     targets: [
         // Core library target containing file system functionality

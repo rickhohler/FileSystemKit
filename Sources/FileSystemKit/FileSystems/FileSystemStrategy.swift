@@ -68,13 +68,77 @@ public struct FormatParameters: Codable {
 
 // MARK: - FileSystemStrategy Protocol
 
-/// Base protocol for file system strategies (Strategy Pattern).
-/// Each modern file system format implements this protocol to parse its specific layout.
+/// Base protocol for file system parsing strategies using the Strategy Pattern.
 ///
-/// **Critical Design: Metadata-First Parsing**
-/// - `parse()` returns FileSystemFolder with File objects containing **metadata only** (no content loaded)
+/// `FileSystemStrategy` defines the interface for parsing different file system formats.
+/// Each file system format (ISO9660, FAT32, etc.) implements this protocol to handle
+/// its specific layout and structure.
+///
+/// ## Overview
+///
+/// File system strategies enable:
+/// - **Format Detection**: Identify file system formats automatically
+/// - **Metadata Parsing**: Extract file system structure without loading file content
+/// - **On-Demand Reading**: Load file content only when needed
+/// - **Format-Specific Operations**: Handle format-specific features
+///
+/// ## Critical Design: Metadata-First Parsing
+///
+/// The strategy pattern uses a metadata-first approach:
+/// - `parse()` returns `FileSystemFolder` with `FileSystemEntry` objects containing **metadata only**
+/// - File content is **not** loaded during parsing
 /// - File content is loaded on-demand via `readFile()` method
 /// - This enables fast parsing of thousands of files without loading all content
+///
+/// ## Usage
+///
+/// Detect file system format:
+/// ```swift
+/// let diskData: RawDiskData = // ... obtained from disk image adapter
+///
+/// if let format = ISO9660Strategy.detectFormat(in: diskData) {
+///     print("Detected format: \(format)")
+/// }
+/// ```
+///
+/// Parse file system structure:
+/// ```swift
+/// let strategy = ISO9660Strategy()
+/// let rootFolder = try strategy.parse(diskData: diskData)
+///
+/// // Traverse files (metadata only, no content loaded)
+/// for component in rootFolder.traverse() {
+///     print("\(component.name): \(component.size) bytes")
+/// }
+/// ```
+///
+/// Read file content on-demand:
+/// ```swift
+/// let file: FileSystemEntry = // ... obtained from parsing
+/// let chunkStorage: ChunkStorage = // ... storage provider
+/// let identifier = ChunkIdentifier(id: file.hash?.hexString ?? "")
+///
+/// // Load file content only when needed
+/// let fileData = try await strategy.readFile(
+///     file,
+///     chunkStorage: chunkStorage,
+///     identifier: identifier
+/// )
+/// ```
+///
+/// ## Performance Considerations
+///
+/// - **Parsing**: Fast - only reads file system metadata structures
+/// - **Content Loading**: On-demand - only loads files that are accessed
+/// - **Memory**: Efficient - avoids loading entire disk images into memory
+///
+/// ## See Also
+///
+/// - ``FileSystemFormat`` - Supported file system formats
+/// - ``FileSystemStrategyFactory`` - Factory for creating strategies
+/// - ``FileSystemFolder`` - Result of parsing
+/// - ``FileSystemEntry`` - File metadata
+/// - [Strategy Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Strategy_pattern) - Design pattern for algorithms
 public protocol FileSystemStrategy {
     /// File system format this strategy handles
     static var format: FileSystemFormat { get }

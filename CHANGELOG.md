@@ -7,6 +7,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.1] - 2025-12-01
+
+### Added
+- **Comprehensive DocC Documentation**: Enhanced documentation with detailed overviews and usage examples
+  - Added comprehensive project overview to main documentation page
+  - Added usage examples to all prominent types (ArchiveContract, ChunkStorage, FileSystemComponent, etc.)
+  - Added Wikipedia references for key concepts (content-addressable storage, file systems, disk images, etc.)
+  - Enhanced documentation for FileSystemEntry, FileSystemFolder, FileSystemEntryMetadata
+  - Added documentation for RawDiskData, DiskGeometry, TrackData, SectorData, FluxData
+  - Added documentation for FileSystemStrategy, FileSystemFormat, ChunkStorage types
+  - Added comprehensive usage examples throughout the API
+- **Documentation Improvements**: 
+  - Enhanced main FileSystemKit.md with project purpose, architecture, and use cases
+  - Added three-layer architecture diagram
+  - Added performance characteristics section
+  - Added integration information with RetroboxFS
+  - Added external resources section with Wikipedia links
+
+### Changed
+- Updated GettingStarted.md to reference version 1.5.0
+
 ## [1.5.0] - 2025-12-01
 
 ### Added

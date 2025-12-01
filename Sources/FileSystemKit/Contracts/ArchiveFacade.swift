@@ -5,22 +5,162 @@ import Foundation
 
 // MARK: - FileSystemKitArchiveFacade
 
-/// Facade implementation of ArchiveContract
-/// Provides stable API while internal implementation can evolve
+/// Default implementation of `ArchiveContract` for working with Snug archives.
 ///
-/// Use this facade to interact with Snug archives. The facade provides a stable API contract
-/// that remains consistent even as the internal implementation evolves.
+/// `FileSystemKitArchiveFacade` provides a stable API for creating, extracting, validating,
+/// and inspecting content-addressable archives. The facade pattern ensures that the public API
+/// remains stable while internal implementations can evolve.
 ///
-/// - Example:
-///   ```swift
-///   let storageURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
-///   let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
-///   let result = try await facade.createArchive(
-///       from: sourceDirectory,
-///       outputURL: archiveURL,
-///       options: .default
-///   )
-///   ```
+/// ## Overview
+///
+/// The facade manages content-addressable storage where files are stored by their cryptographic
+/// hash. This enables deduplication, integrity verification, and efficient storage.
+///
+/// ## Initialization
+///
+/// Create a facade with a storage directory:
+/// ```swift
+/// let storageURL = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask)[0]
+/// let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+/// ```
+///
+/// Use a custom hash algorithm:
+/// ```swift
+/// let facade = FileSystemKitArchiveFacade(
+///     storageURL: storageURL,
+///     hashAlgorithm: "sha256"
+/// )
+/// ```
+///
+/// ## Creating Archives
+///
+/// Create an archive from a directory:
+/// ```swift
+/// let sourceURL = URL(fileURLWithPath: "/path/to/source")
+/// let archiveURL = URL(fileURLWithPath: "/path/to/archive.snug")
+///
+/// let result = try await facade.createArchive(
+///     from: sourceURL,
+///     outputURL: archiveURL,
+///     options: .default
+/// )
+///
+/// print("Created archive with \(result.filesProcessed) files")
+/// print("Total size: \(result.totalSize) bytes")
+/// ```
+///
+/// Create with custom options:
+/// ```swift
+/// let options = ArchiveOptions(
+///     hashAlgorithm: "sha256",
+///     ignorePatterns: ["*.tmp", ".git/*", "build/"],
+///     preserveSymlinks: true,
+///     verbose: true
+/// )
+///
+/// let result = try await facade.createArchive(
+///     from: sourceURL,
+///     outputURL: archiveURL,
+///     options: options
+/// )
+/// ```
+///
+/// ## Extracting Archives
+///
+/// Extract an archive to a directory:
+/// ```swift
+/// let archiveURL = URL(fileURLWithPath: "/path/to/archive.snug")
+/// let outputURL = URL(fileURLWithPath: "/path/to/output")
+///
+/// let result = try await facade.extractArchive(
+///     from: archiveURL,
+///     to: outputURL,
+///     options: .preservePermissions
+/// )
+///
+/// print("Extracted \(result.filesExtracted) files to \(result.outputURL)")
+/// ```
+///
+/// ## Validating Archives
+///
+/// Check that all files in an archive exist in storage:
+/// ```swift
+/// let archiveURL = URL(fileURLWithPath: "/path/to/archive.snug")
+///
+/// let result = try await facade.validateArchive(at: archiveURL)
+///
+/// if result.allFilesExist {
+///     print("✓ All \(result.totalFiles) files are present")
+/// } else {
+///     print("✗ Missing \(result.filesMissing) of \(result.totalFiles) files")
+///     for hash in result.missingHashes {
+///         print("  Missing: \(hash)")
+///     }
+/// }
+/// ```
+///
+/// ## Listing Archive Contents
+///
+/// List files in an archive without extracting:
+/// ```swift
+/// let archiveURL = URL(fileURLWithPath: "/path/to/archive.snug")
+///
+/// let listing = try await facade.contents(
+///     of: archiveURL,
+///     options: .withMetadata
+/// )
+///
+/// print("Archive contains \(listing.totalFiles) files (\(listing.totalSize) bytes)")
+///
+/// for entry in listing.entries {
+///     if entry.type == "file" {
+///         print("  \(entry.path): \(entry.size ?? 0) bytes")
+///     } else if entry.type == "directory" {
+///         print("  \(entry.path)/")
+///     }
+/// }
+/// ```
+///
+/// ## Loading Metadata
+///
+/// Load archive metadata for programmatic access:
+/// ```swift
+/// let archiveURL = URL(fileURLWithPath: "/path/to/archive.snug")
+///
+/// let archive = try facade.loadMetadata(from: archiveURL)
+///
+/// print("Format: \(archive.format)")
+/// print("Version: \(archive.version)")
+/// print("Entries: \(archive.entries.count)")
+///
+/// for entry in archive.entries {
+///     print("  \(entry.path) (\(entry.type))")
+/// }
+/// ```
+///
+/// ## Storage Requirements
+///
+/// The `storageURL` must:
+/// - Point to a persistent directory that will remain available
+/// - Have write permissions for archive creation
+/// - Have read permissions for archive extraction and validation
+/// - Be accessible for the lifetime of archives created with this facade
+///
+/// **Important**: The storage directory contains content-addressable chunks that may be
+/// shared across multiple archives. Do not delete files from this directory manually.
+///
+/// ## Thread Safety
+///
+/// `FileSystemKitArchiveFacade` is thread-safe and can be used concurrently from multiple
+/// threads or async tasks. Each facade instance manages its own storage configuration.
+///
+/// ## See Also
+///
+/// - ``ArchiveContract`` - Protocol definition
+/// - ``ArchiveOptions`` - Archive creation options
+/// - ``ExtractOptions`` - Extraction options
+/// - [Facade Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Facade_pattern) - Design pattern for simplified interfaces
+/// - [Content-Addressable Storage (Wikipedia)](https://en.wikipedia.org/wiki/Content-addressable_storage) - Overview of content-addressable storage
 public struct FileSystemKitArchiveFacade: ArchiveContract {
     private let storageURL: URL
     private let hashAlgorithm: String

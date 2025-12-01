@@ -5,9 +5,72 @@
 
 import Foundation
 
-/// File system format enumeration
-/// Represents the original file system layout (not the modern image format)
-/// Includes both modern formats (FileSystemKit) and vintage formats (for compatibility)
+/// Enumeration of supported file system formats.
+///
+/// `FileSystemFormat` represents the original file system layout (not the disk image format).
+/// It includes both modern formats (post-2000, still in use) and vintage formats
+/// (pre-2000, for compatibility with extended packages).
+///
+/// ## Modern Formats (FileSystemKit)
+///
+/// Formats still in common use:
+/// - `.iso9660` - ISO 9660 CD-ROM/DVD-ROM file system
+/// - `.fat32` - FAT32 file system
+/// - `.ntfs` - NTFS file system (future support)
+/// - `.exfat` - exFAT file system (future support)
+///
+/// ## Vintage Formats (Extended Packages)
+///
+/// Formats for compatibility with packages like RetroboxFS:
+/// - Apple II: `.apple2DOS33`, `.apple2ProDOS`, `.apple2Pascal`
+/// - Commodore 64: `.c64_1541`, `.c64_1581`, `.c64_TAP`, `.c64_T64`
+/// - Atari 8-bit: `.atariDOS20`, `.atariDOS25`
+/// - And many more...
+///
+/// ## Usage
+///
+/// Check format properties:
+/// ```swift
+/// let format = FileSystemFormat.iso9660
+///
+/// print("Format: \(format.displayName)")
+/// print("Capacity: \(format.typicalCapacity) bytes")
+/// print("Inception: \(format.metadata.inceptionYear)")
+/// print("Still in use: \(format.metadata.isStillInUse)")
+/// ```
+///
+/// Iterate all formats:
+/// ```swift
+/// for format in FileSystemFormat.allCases {
+///     if format.metadata.isStillInUse {
+///         print("\(format.displayName) - still in use")
+///     }
+/// }
+/// ```
+///
+/// Use with file system strategies:
+/// ```swift
+/// let format = FileSystemFormat.iso9660
+///
+/// if let strategy = FileSystemStrategyFactory.createStrategy(for: format) {
+///     let rootFolder = try strategy.parse(diskData: diskData)
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `displayName` - Human-readable format name
+/// - `typicalCapacity` - Typical disk capacity in bytes
+/// - `metadata` - Format metadata including inception year
+///
+/// ## See Also
+///
+/// - ``FileSystemFormatMetadata`` - Format metadata
+/// - ``FileSystemStrategy`` - Strategy for parsing formats
+/// - [ISO 9660 (Wikipedia)](https://en.wikipedia.org/wiki/ISO_9660) - CD-ROM/DVD-ROM file system standard
+/// - [FAT32 (Wikipedia)](https://en.wikipedia.org/wiki/File_Allocation_Table#FAT32) - FAT32 file system details
+/// - [NTFS (Wikipedia)](https://en.wikipedia.org/wiki/NTFS) - NTFS file system details
+/// - [exFAT (Wikipedia)](https://en.wikipedia.org/wiki/ExFAT) - exFAT file system details
 public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
     // Modern file systems (post-2000, still in use) - FileSystemKit
     case iso9660 = "iso9660"      // ISO 9660 CD-ROM/DVD-ROM
@@ -142,7 +205,44 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
 
 // MARK: - FileSystemFormatMetadata
 
-/// Metadata about a file system format
+/// Metadata describing a file system format's history and usage.
+///
+/// `FileSystemFormatMetadata` provides information about when a file system format
+/// was created and whether it's still in use, helping to distinguish modern formats
+/// from vintage formats.
+///
+/// ## Usage
+///
+/// Check if format is still in use:
+/// ```swift
+/// let metadata = FileSystemFormat.iso9660.metadata
+///
+/// if metadata.isStillInUse {
+///     print("Format is still actively used")
+/// } else {
+///     print("Format was popular until \(metadata.endOfPopularityYear ?? 0)")
+/// }
+/// ```
+///
+/// Determine if format belongs in FileSystemKit:
+/// ```swift
+/// let metadata = FileSystemFormat.fat32.metadata
+///
+/// if metadata.belongsInFileSystemKit {
+///     print("Format is supported by FileSystemKit")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `inceptionYear` - Year the format was created/introduced
+/// - `endOfPopularityYear` - Year it fell out of common use (nil if still in use)
+/// - `isStillInUse` - Whether the format is still actively used
+/// - `belongsInFileSystemKit` - Whether format belongs in FileSystemKit (post-2000 or still in use)
+///
+/// ## See Also
+///
+/// - ``FileSystemFormat`` - Format enumeration
 public struct FileSystemFormatMetadata: Codable, Sendable {
     /// Year the file system was created/introduced
     public let inceptionYear: Int

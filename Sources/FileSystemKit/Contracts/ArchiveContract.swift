@@ -6,9 +6,78 @@ import Foundation
 
 // MARK: - ArchiveContract
 
-/// Stable contract for archive operations
-/// This protocol defines the public API that client applications depend on.
-/// Internal implementations can change freely as long as they conform to this contract.
+/// Stable contract for archive operations using the Snug archive format.
+///
+/// `ArchiveContract` defines the public API for creating, extracting, validating, and inspecting
+/// content-addressable archives. This protocol provides a stable interface that client applications
+/// can depend on, while allowing internal implementations to evolve.
+///
+/// ## Overview
+///
+/// The Snug archive format uses content-addressable storage, where files are stored by their
+/// cryptographic hash rather than by name. This enables:
+/// - **Deduplication**: Identical files are stored only once
+/// - **Integrity**: Files can be verified using their hash
+/// - **Efficiency**: Archives reference files rather than embedding them
+///
+/// ## Usage
+///
+/// Create an archive from a directory:
+/// ```swift
+/// let facade = FileSystemKitArchiveFacade(storageURL: storageURL)
+/// let result = try await facade.createArchive(
+///     from: sourceDirectoryURL,
+///     outputURL: archiveURL,
+///     options: .default
+/// )
+/// print("Created archive with \(result.filesProcessed) files")
+/// ```
+///
+/// Extract an archive:
+/// ```swift
+/// let result = try await facade.extractArchive(
+///     from: archiveURL,
+///     to: outputDirectoryURL,
+///     options: .preservePermissions
+/// )
+/// ```
+///
+/// List archive contents without extracting:
+/// ```swift
+/// let listing = try await facade.contents(of: archiveURL)
+/// for entry in listing.entries {
+///     print("\(entry.path): \(entry.size ?? 0) bytes")
+/// }
+/// ```
+///
+/// ## Topics
+///
+/// ### Creating Archives
+/// - ``createArchive(from:outputURL:options:)``
+/// - ``ArchiveOptions``
+/// - ``ArchiveResult``
+///
+/// ### Extracting Archives
+/// - ``extractArchive(from:to:options:)``
+/// - ``ExtractOptions``
+/// - ``ExtractResult``
+///
+/// ### Validating Archives
+/// - ``validateArchive(at:options:)``
+/// - ``ValidateOptions``
+/// - ``ValidationResult``
+///
+/// ### Inspecting Archives
+/// - ``contents(of:options:)``
+/// - ``loadMetadata(from:)``
+/// - ``ArchiveListing``
+/// - ``ArchiveListingEntry``
+///
+/// ## See Also
+///
+/// - ``FileSystemKitArchiveFacade`` - Default implementation
+/// - [Snug Archive Format Documentation](https://github.com/rickhohler/FileSystemKit/wiki/Snug-Format)
+/// - [Content-Addressable Storage (Wikipedia)](https://en.wikipedia.org/wiki/Content-addressable_storage) - Overview of content-addressable storage systems
 public protocol ArchiveContract: Sendable {
     /// Creates an archive from a directory.
     ///
@@ -137,7 +206,65 @@ public protocol ArchiveContract: Sendable {
 
 // MARK: - ArchiveOptions
 
-/// Options for archive creation (stable contract)
+/// Configuration options for creating Snug archives.
+///
+/// `ArchiveOptions` controls how archives are created, including hash algorithm selection,
+/// symlink handling, and file filtering.
+///
+/// ## Usage
+///
+/// Use default options:
+/// ```swift
+/// let options = ArchiveOptions.default
+/// ```
+///
+/// Customize options:
+/// ```swift
+/// let options = ArchiveOptions(
+///     hashAlgorithm: "sha256",
+///     ignorePatterns: ["*.tmp", ".git/*"],
+///     preserveSymlinks: true
+/// )
+/// ```
+///
+/// Use convenience presets:
+/// ```swift
+/// let verboseOptions = ArchiveOptions.verbose
+/// let symlinkOptions = ArchiveOptions.preserveSymlinks
+/// ```
+///
+/// ## Hash Algorithms
+///
+/// Supported hash algorithms:
+/// - `"sha256"` (default, recommended) - Secure and widely supported
+/// - `"sha1"` - Faster but less secure
+/// - `"md5"` - Fastest but not cryptographically secure
+///
+/// ## Symlink Handling
+///
+/// Choose one of:
+/// - `preserveSymlinks: true` - Store symlinks as-is in archive
+/// - `followSymlinks: true` - Resolve symlinks and store target files
+///
+/// **Note**: `preserveSymlinks` and `followSymlinks` are mutually exclusive.
+///
+/// ## Ignore Patterns
+///
+/// Use glob patterns to exclude files:
+/// ```swift
+/// let options = ArchiveOptions(
+///     ignorePatterns: ["*.tmp", "build/*", ".git/**"]
+/// )
+/// ```
+///
+/// Patterns support:
+/// - `*` - Matches any characters except `/`
+/// - `**` - Matches any characters including `/`
+/// - `?` - Matches a single character
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/createArchive(from:outputURL:options:)``
 public struct ArchiveOptions: Sendable {
     /// Hash algorithm to use for content-addressable storage
     public let hashAlgorithm: String
@@ -209,7 +336,39 @@ public struct ArchiveOptions: Sendable {
 
 // MARK: - ExtractOptions
 
-/// Options for archive extraction (stable contract)
+/// Configuration options for extracting Snug archives.
+///
+/// `ExtractOptions` controls how archives are extracted, including permission preservation
+/// and output verbosity.
+///
+/// ## Usage
+///
+/// Use default options:
+/// ```swift
+/// let options = ExtractOptions.default
+/// ```
+///
+/// Preserve file permissions (recommended for production):
+/// ```swift
+/// let options = ExtractOptions.preservePermissions
+/// ```
+///
+/// Customize options:
+/// ```swift
+/// let options = ExtractOptions(
+///     verbose: true,
+///     preservePermissions: true
+/// )
+/// ```
+///
+/// ## Permission Preservation
+///
+/// When `preservePermissions` is `true`, file permissions from the archive are restored
+/// on extracted files. This is recommended for production use to maintain file security.
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/extractArchive(from:to:options:)``
 public struct ExtractOptions: Sendable {
     /// Enable verbose output during extraction
     public let verbose: Bool
@@ -242,7 +401,34 @@ public struct ExtractOptions: Sendable {
 
 // MARK: - ValidateOptions
 
-/// Options for archive validation (stable contract)
+/// Configuration options for validating Snug archives.
+///
+/// `ValidateOptions` controls how archive validation is performed, including output verbosity.
+///
+/// ## Usage
+///
+/// Use default options:
+/// ```swift
+/// let options = ValidateOptions.default
+/// ```
+///
+/// Enable verbose output for debugging:
+/// ```swift
+/// let options = ValidateOptions.verbose
+/// ```
+///
+/// ## Validation Process
+///
+/// Validation checks that all files referenced in the archive metadata exist in the
+/// content-addressable storage. This is useful for:
+/// - Verifying archive integrity
+/// - Checking for missing files
+/// - Auditing storage completeness
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/validateArchive(at:options:)``
+/// - ``ValidationResult``
 public struct ValidateOptions: Sendable {
     /// Enable verbose output during validation
     public let verbose: Bool
@@ -263,7 +449,45 @@ public struct ValidateOptions: Sendable {
 
 // MARK: - ListOptions
 
-/// Options for archive listing (stable contract)
+/// Configuration options for listing Snug archive contents.
+///
+/// `ListOptions` controls what information is included when listing archive contents,
+/// including metadata like file sizes and hashes.
+///
+/// ## Usage
+///
+/// List paths only (fastest):
+/// ```swift
+/// let options = ListOptions.default
+/// ```
+///
+/// Include file metadata:
+/// ```swift
+/// let options = ListOptions.withMetadata
+/// ```
+///
+/// Customize options:
+/// ```swift
+/// let options = ListOptions(
+///     verbose: true,
+///     includeMetadata: true
+/// )
+/// ```
+///
+/// ## Metadata Inclusion
+///
+/// When `includeMetadata` is `true`, the listing includes:
+/// - File sizes (in bytes)
+/// - Content hashes (if available)
+/// - File types (file, directory, symlink)
+///
+/// **Note**: Including metadata requires reading the archive metadata file, which may
+/// be slower for large archives.
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/contents(of:options:)``
+/// - ``ArchiveListing``
 public struct ListOptions: Sendable {
     /// Enable verbose output during listing
     public let verbose: Bool
@@ -296,7 +520,34 @@ public struct ListOptions: Sendable {
 
 // MARK: - ArchiveResult
 
-/// Result of archive creation (stable contract)
+/// Result returned after successfully creating a Snug archive.
+///
+/// `ArchiveResult` provides statistics about the archive creation process, including
+/// the number of files processed and total size.
+///
+/// ## Usage
+///
+/// ```swift
+/// let result = try await facade.createArchive(
+///     from: sourceURL,
+///     outputURL: outputURL,
+///     options: .default
+/// )
+///
+/// print("Processed \(result.filesProcessed) files")
+/// print("Total size: \(result.totalSize) bytes")
+/// print("Archive location: \(result.archiveURL)")
+/// ```
+///
+/// ## Properties
+///
+/// - `filesProcessed` - Number of files included in the archive
+/// - `totalSize` - Total size of all files in bytes (before deduplication)
+/// - `archiveURL` - Location of the created archive file
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/createArchive(from:outputURL:options:)``
 public struct ArchiveResult: Sendable, CustomStringConvertible {
     /// Number of files processed during archive creation
     public let filesProcessed: Int
@@ -327,7 +578,32 @@ public struct ArchiveResult: Sendable, CustomStringConvertible {
 
 // MARK: - ExtractResult
 
-/// Result of archive extraction (stable contract)
+/// Result returned after successfully extracting a Snug archive.
+///
+/// `ExtractResult` provides information about the extraction process, including
+/// the number of files extracted and the output location.
+///
+/// ## Usage
+///
+/// ```swift
+/// let result = try await facade.extractArchive(
+///     from: archiveURL,
+///     to: outputURL,
+///     options: .preservePermissions
+/// )
+///
+/// print("Extracted \(result.filesExtracted) files")
+/// print("Output location: \(result.outputURL)")
+/// ```
+///
+/// ## Properties
+///
+/// - `filesExtracted` - Number of files extracted from the archive
+/// - `outputURL` - Directory where files were extracted
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/extractArchive(from:to:options:)``
 public struct ExtractResult: Sendable, CustomStringConvertible {
     /// Number of files extracted from the archive
     public let filesExtracted: Int
@@ -353,7 +629,42 @@ public struct ExtractResult: Sendable, CustomStringConvertible {
 
 // MARK: - ValidationResult
 
-/// Result of archive validation (stable contract)
+/// Result returned after validating a Snug archive.
+///
+/// `ValidationResult` indicates whether all files referenced in the archive exist
+/// in the content-addressable storage, and provides details about missing files if any.
+///
+/// ## Usage
+///
+/// ```swift
+/// let result = try await facade.validateArchive(at: archiveURL)
+///
+/// if result.allFilesExist {
+///     print("All \(result.totalFiles) files are present")
+/// } else {
+///     print("Missing \(result.filesMissing) of \(result.totalFiles) files")
+///     print("Missing hashes: \(result.missingHashes)")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `allFilesExist` - `true` if all referenced files are present in storage
+/// - `totalFiles` - Total number of files referenced in the archive
+/// - `filesFound` - Number of files found in storage
+/// - `filesMissing` - Number of files missing from storage
+/// - `missingHashes` - Array of hash values for missing files
+///
+/// ## Use Cases
+///
+/// Validation is useful for:
+/// - Verifying archive integrity before extraction
+/// - Auditing storage completeness
+/// - Identifying missing files that need to be restored
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/validateArchive(at:options:)``
 public struct ValidationResult: Sendable, CustomStringConvertible {
     /// Whether all files referenced in the archive exist in storage
     public let allFilesExist: Bool
@@ -404,7 +715,40 @@ public struct ValidationResult: Sendable, CustomStringConvertible {
 
 // MARK: - ArchiveListing
 
-/// Archive file listing (stable contract)
+/// Complete listing of files in a Snug archive.
+///
+/// `ArchiveListing` provides a snapshot of all files in an archive without extracting them.
+/// This is useful for previewing archive contents or building file browsers.
+///
+/// ## Usage
+///
+/// ```swift
+/// let listing = try await facade.contents(of: archiveURL, options: .withMetadata)
+///
+/// print("Archive contains \(listing.totalFiles) files")
+/// print("Total size: \(listing.totalSize) bytes")
+///
+/// for entry in listing.entries {
+///     print("\(entry.path): \(entry.size ?? 0) bytes")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `entries` - Array of file entries in the archive
+/// - `totalFiles` - Total number of files
+/// - `totalSize` - Total size of all files in bytes
+///
+/// ## Performance
+///
+/// Listing archive contents is fast because it only reads the archive metadata file,
+/// not the actual file content. Including metadata (`includeMetadata: true`) adds
+/// minimal overhead.
+///
+/// ## See Also
+///
+/// - ``ArchiveContract/contents(of:options:)``
+/// - ``ArchiveListingEntry``
 public struct ArchiveListing: Sendable, CustomStringConvertible {
     /// Array of file entries in the archive
     public let entries: [ArchiveListingEntry]
@@ -435,7 +779,46 @@ public struct ArchiveListing: Sendable, CustomStringConvertible {
 
 // MARK: - ArchiveListingEntry
 
-/// Single entry in archive listing (stable contract)
+/// Represents a single file, directory, or symlink in an archive listing.
+///
+/// `ArchiveListingEntry` provides information about an individual item in an archive,
+/// including its path, type, size, and content hash (if available).
+///
+/// ## Usage
+///
+/// ```swift
+/// let listing = try await facade.contents(of: archiveURL, options: .withMetadata)
+///
+/// for entry in listing.entries {
+///     switch entry.type {
+///     case "file":
+///         print("File: \(entry.path) (\(entry.size ?? 0) bytes)")
+///     case "directory":
+///         print("Directory: \(entry.path)")
+///     case "symlink":
+///         print("Symlink: \(entry.path)")
+///     default:
+///         print("Unknown: \(entry.path)")
+///     }
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `path` - File path within the archive (relative to archive root)
+/// - `type` - File type: `"file"`, `"directory"`, or `"symlink"`
+/// - `size` - File size in bytes (nil for directories or if not requested)
+/// - `hash` - Content hash (nil if not requested or not available)
+///
+/// ## File Types
+///
+/// - `"file"` - Regular file
+/// - `"directory"` - Directory/folder
+/// - `"symlink"` - Symbolic link
+///
+/// ## See Also
+///
+/// - ``ArchiveListing``
 public struct ArchiveListingEntry: Sendable {
     /// File path within the archive
     public let path: String

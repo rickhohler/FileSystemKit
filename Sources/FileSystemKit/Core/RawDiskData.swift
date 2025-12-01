@@ -19,7 +19,14 @@ import CommonCrypto
 
 // MARK: - SectorData
 
-/// Represents a logical sector from a disk
+/// Represents a logical sector from a disk.
+///
+/// `SectorData` contains the decoded data from a single disk sector, including
+/// track and sector numbers, sector data, and optional flags.
+///
+/// ## See Also
+///
+/// - [Disk Sector (Wikipedia)](https://en.wikipedia.org/wiki/Disk_sector) - Information about disk sectors
 public struct SectorData: Codable, Equatable {
     /// Track number (0-based)
     public let track: Int
@@ -59,7 +66,17 @@ public struct SectorFlags: OptionSet, Codable, Sendable {
 
 // MARK: - TrackData
 
-/// Represents track-level data from a disk
+/// Represents track-level data from a disk.
+///
+/// `TrackData` contains information about a single track including its sectors,
+/// encoding scheme, and density. This is useful for vintage disk formats that
+/// use track-based organization.
+///
+/// ## See Also
+///
+/// - ``SectorData`` - Individual sector data
+/// - ``TrackEncoding`` - Track encoding schemes
+/// - [Track (disk drive) (Wikipedia)](https://en.wikipedia.org/wiki/Track_(disk_drive)) - Information about disk tracks
 public struct TrackData: Codable, Equatable {
     /// Track number (0-based)
     public let track: Int
@@ -91,7 +108,17 @@ public struct TrackData: Codable, Equatable {
     }
 }
 
-/// Track encoding schemes
+/// Track encoding schemes used for magnetic disk storage.
+///
+/// Different encoding schemes were used by various computer systems to store
+/// data on magnetic disks. Each encoding has different characteristics for
+/// density, reliability, and compatibility.
+///
+/// ## See Also
+///
+/// - [Group Code Recording (Wikipedia)](https://en.wikipedia.org/wiki/Group_code_recording) - GCR encoding details
+/// - [Modified Frequency Modulation (Wikipedia)](https://en.wikipedia.org/wiki/Modified_frequency_modulation) - MFM encoding details
+/// - [Frequency Modulation (Wikipedia)](https://en.wikipedia.org/wiki/Frequency_modulation) - FM encoding details
 public enum TrackEncoding: String, Codable {
     case gcr = "gcr"           // Group Code Recording (Apple II, Commodore)
     case mfm = "mfm"           // Modified Frequency Modulation (MS-DOS, CP/M)
@@ -161,8 +188,16 @@ public enum FluxCaptureType: String, Codable {
 
 // MARK: - FluxData
 
-/// Raw magnetic flux transitions from a disk
-/// Preserves exact timing information for copy protection and accurate emulation
+/// Raw magnetic flux transitions from a disk.
+///
+/// `FluxData` preserves exact timing information for copy protection and accurate emulation.
+/// This data format captures the magnetic flux transitions directly from the disk surface,
+/// enabling preservation of copy-protected disks and accurate emulation.
+///
+/// ## See Also
+///
+/// - [Magnetic Storage (Wikipedia)](https://en.wikipedia.org/wiki/Magnetic_storage) - Overview of magnetic storage
+/// - [Copy Protection (Wikipedia)](https://en.wikipedia.org/wiki/Copy_protection) - Information about copy protection
 public struct FluxData: Codable, Equatable {
     /// Flux data per track
     public let tracks: [FluxTrack]
@@ -228,7 +263,68 @@ public struct DiskImageHash: Hashable, Codable, Sendable {
 
 // MARK: - DiskImageMetadata
 
-/// Metadata about a disk image
+/// Metadata describing a disk image's properties and provenance.
+///
+/// `DiskImageMetadata` provides comprehensive information about a disk image including
+/// title, publisher, developer, copyright, version, and other descriptive information.
+/// This metadata helps with cataloging, searching, and identifying disk images.
+///
+/// ## Usage
+///
+/// Create metadata for a disk image:
+/// ```swift
+/// let metadata = DiskImageMetadata(
+///     title: "My Application",
+///     publisher: "Acme Software",
+///     developer: "John Developer",
+///     copyright: "© 2024 Acme Software",
+///     version: "1.0.0",
+///     language: "en",
+///     requiresPlatform: "macOS",
+///     imageDate: Date(),
+///     geometry: diskGeometry
+/// )
+/// ```
+///
+/// Add tags for categorization:
+/// ```swift
+/// var metadata = DiskImageMetadata()
+/// metadata.tags = ["game", "adventure", "1980s"]
+/// ```
+///
+/// Include copy protection information:
+/// ```swift
+/// let metadata = DiskImageMetadata(
+///     title: "Protected Game",
+///     copyProtection: CopyProtectionInfo(
+///         type: .nibble,
+///         description: "Nibble-based copy protection"
+///     )
+/// )
+/// ```
+///
+/// ## Properties
+///
+/// - `title` - Disk title/name
+/// - `publisher` - Publisher name
+/// - `developer` - Developer name
+/// - `copyright` - Copyright information
+/// - `version` - Version number
+/// - `language` - Language code
+/// - `requiresPlatform` - Required platform
+/// - `requiresMachine` - Required machine
+/// - `notes` - Additional notes
+/// - `imageDate` - Image creation date
+/// - `contributor` - Contributor name
+/// - `geometry` - Disk geometry information
+/// - `copyProtection` - Copy protection details
+/// - `tags` - Categorization tags
+///
+/// ## See Also
+///
+/// - ``RawDiskData`` - Disk data container
+/// - ``DiskGeometry`` - Disk geometry information
+/// - [Metadata (Wikipedia)](https://en.wikipedia.org/wiki/Metadata) - Overview of metadata concepts
 public struct DiskImageMetadata: Codable, Sendable {
     /// Disk title/name
     public var title: String?
@@ -308,7 +404,30 @@ public struct DiskImageMetadata: Codable, Sendable {
 
 // MARK: - DiskGeometry
 
-/// Disk geometry information
+/// Disk geometry information describing the physical layout of a disk.
+///
+/// `DiskGeometry` specifies the number of tracks, sides, sectors per track, and
+/// sector size. This information is essential for reading and writing disk images
+/// accurately, especially for vintage formats.
+///
+/// ## Usage
+///
+/// Create geometry for a standard floppy disk:
+/// ```swift
+/// let geometry = DiskGeometry(
+///     tracks: 80,
+///     sides: 2,
+///     sectorsPerTrack: 18,
+///     sectorSize: 512
+/// )
+///
+/// print("Capacity: \(geometry.totalCapacity) bytes")
+/// ```
+///
+/// ## See Also
+///
+/// - ``RawDiskData`` - Uses disk geometry
+/// - [Cylinder-head-sector (Wikipedia)](https://en.wikipedia.org/wiki/Cylinder-head-sector) - CHS addressing system
 public struct DiskGeometry: Codable, Equatable, Sendable {
     /// Number of tracks
     public let tracks: Int
@@ -373,8 +492,87 @@ public enum CopyProtectionType: String, Codable, Sendable {
 
 // MARK: - RawDiskData
 
-/// Raw disk data extracted from modern image format.
-/// This is the output of DiskImageAdapter (Layer 2) and input to FileSystemStrategy (Layer 3).
+/// Raw disk data extracted from modern disk image formats.
+///
+/// `RawDiskData` represents the raw binary data extracted from disk image formats
+/// (DMG, ISO, VHD, etc.). It serves as the bridge between disk image adapters
+/// (Layer 2) and file system strategies (Layer 3).
+///
+/// ## Overview
+///
+/// Raw disk data can contain:
+/// - **Sector Data**: Logical sectors decoded from the disk image
+/// - **Track Data**: Track-level information with encoding details
+/// - **Flux Data**: Raw magnetic flux transitions (for preservation formats)
+/// - **Metadata**: Disk image metadata (title, geometry, etc.)
+///
+/// ## Usage
+///
+/// Create from raw data:
+/// ```swift
+/// let diskImageData = try Data(contentsOf: diskImageURL)
+/// let rawDiskData = RawDiskData(rawData: diskImageData)
+/// ```
+///
+/// Create with sectors:
+/// ```swift
+/// let sectors: [SectorData] = // ... decoded sectors
+/// let rawDiskData = RawDiskData(sectors: sectors, rawData: diskImageData)
+/// ```
+///
+/// Read data at specific offset:
+/// ```swift
+/// let rawDiskData: RawDiskData = // ... obtained from adapter
+///
+/// // Read 512 bytes starting at offset 1024
+/// let data = try rawDiskData.readData(at: 1024, length: 512)
+/// ```
+///
+/// Access disk geometry:
+/// ```swift
+/// let geometry = rawDiskData.getGeometry()
+/// print("Tracks: \(geometry.tracks), Sectors: \(geometry.sectorsPerTrack)")
+/// print("Capacity: \(geometry.totalCapacity) bytes")
+/// ```
+///
+/// Generate hash for deduplication:
+/// ```swift
+/// let hash = try rawDiskData.generateHash(algorithm: .sha256)
+/// print("Disk hash: \(hash.hexString)")
+/// ```
+///
+/// Access metadata:
+/// ```swift
+/// if let metadata = rawDiskData.metadata {
+///     print("Title: \(metadata.title ?? "Unknown")")
+///     print("Publisher: \(metadata.publisher ?? "Unknown")")
+/// }
+/// ```
+///
+/// ## Architecture Role
+///
+/// `RawDiskData` is the output of **Layer 2** (Disk Image Adapters) and the input
+/// to **Layer 3** (File System Strategies):
+///
+/// ```
+/// Disk Image (DMG/ISO/VHD) 
+///   → DiskImageAdapter (Layer 2)
+///   → RawDiskData
+///   → FileSystemStrategy (Layer 3)
+///   → FileSystemFolder
+/// ```
+///
+/// ## See Also
+///
+/// - ``SectorData`` - Logical sector representation
+/// - ``TrackData`` - Track-level data
+/// - ``FluxData`` - Raw flux transitions
+/// - ``DiskImageMetadata`` - Disk metadata
+/// - ``DiskGeometry`` - Disk geometry information
+/// - [Disk Image (Wikipedia)](https://en.wikipedia.org/wiki/Disk_image) - Overview of disk image formats
+/// - [DMG (Wikipedia)](https://en.wikipedia.org/wiki/Apple_Disk_Image) - Apple Disk Image format
+/// - [ISO Image (Wikipedia)](https://en.wikipedia.org/wiki/ISO_image) - ISO 9660 disk images
+/// - [VHD (Wikipedia)](https://en.wikipedia.org/wiki/VHD_(file_format)) - Virtual Hard Disk format
 public class RawDiskData {
     /// Logical sector data (decoded from flux if needed)
     public var sectors: [SectorData]?

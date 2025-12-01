@@ -21,7 +21,51 @@ import CommonCrypto
 // MARK: - FileSystemComponent Protocol
 
 /// Base protocol for file system components (files and folders).
-/// Implements the Composite Pattern to treat files and directories uniformly.
+///
+/// `FileSystemComponent` implements the Composite Pattern, allowing files and directories
+/// to be treated uniformly. This enables recursive traversal and uniform operations
+/// across the file system hierarchy.
+///
+/// ## Overview
+///
+/// File system components can be either:
+/// - **Files** (`FileSystemEntry`) - Leaf nodes containing file data
+/// - **Folders** (`FileSystemFolder`) - Composite nodes containing other components
+///
+/// ## Usage
+///
+/// Traverse a file system hierarchy:
+/// ```swift
+/// let rootFolder: FileSystemFolder = // ... obtained from parser
+///
+/// // Get all components recursively
+/// let allComponents = rootFolder.traverse()
+///
+/// for component in allComponents {
+///     print("\(component.name): \(component.size) bytes")
+/// }
+/// ```
+///
+/// Access parent folder:
+/// ```swift
+/// let file: FileSystemComponent = // ... a file or folder
+///
+/// if let parent = file.parent {
+///     print("Parent: \(parent.name)")
+/// }
+/// ```
+///
+/// ## Design Principles
+///
+/// - **Metadata-First**: Components always have metadata (name, size, dates) available
+/// - **Lazy Content**: File content is loaded on-demand, not during parsing
+/// - **Uniform Interface**: Files and folders share the same protocol interface
+///
+/// ## See Also
+///
+/// - ``FileSystemEntry`` - File implementation
+/// - ``FileSystemFolder`` - Folder implementation
+/// - [Composite Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Composite_pattern) - Design pattern for tree structures
 public protocol FileSystemComponent: AnyObject {
     /// Name of the file or directory
     var name: String { get }
@@ -41,7 +85,42 @@ public protocol FileSystemComponent: AnyObject {
 
 // MARK: - FileLocation
 
-/// Describes where file data is stored in a disk image
+/// Describes the physical location of file data within a disk image.
+///
+/// `FileLocation` provides precise information about where file content is stored,
+/// including track/sector information (for vintage formats) and byte offsets.
+///
+/// ## Usage
+///
+/// Create a file location:
+/// ```swift
+/// let location = FileLocation(
+///     track: 0,
+///     sector: 5,
+///     offset: 1024,
+///     length: 512
+/// )
+/// ```
+///
+/// For modern formats without track/sector:
+/// ```swift
+/// let location = FileLocation(
+///     offset: 2048,
+///     length: 1024
+/// )
+/// ```
+///
+/// ## Properties
+///
+/// - `track` - Track number (for vintage disk formats, nil for modern formats)
+/// - `sector` - Sector number (for vintage disk formats, nil for modern formats)
+/// - `offset` - Byte offset from start of disk image
+/// - `length` - Length of file data in bytes
+///
+/// ## See Also
+///
+/// - ``FileSystemEntry`` - Uses FileLocation to store file data location
+/// - [Disk Sector (Wikipedia)](https://en.wikipedia.org/wiki/Disk_sector) - Information about disk sectors
 public struct FileLocation: Codable, Equatable {
     /// Track number (if applicable)
     public let track: Int?
@@ -65,7 +144,57 @@ public struct FileLocation: Codable, Equatable {
 
 // MARK: - FileHash
 
-/// Cryptographic hash for a file
+/// Cryptographic hash for file content verification and identification.
+///
+/// `FileHash` represents a cryptographic hash of file content, supporting multiple
+/// hash algorithms. It's used for content-addressable storage and integrity verification.
+///
+/// ## Usage
+///
+/// Create a hash from data:
+/// ```swift
+/// let data = "Hello, World!".data(using: .utf8)!
+/// let hash = FileHash(algorithm: .sha256, value: sha256Hash(data))
+///
+/// print("Hash: \(hash.hexString)")
+/// print("Identifier: \(hash.identifier)")
+/// ```
+///
+/// Compare hashes:
+/// ```swift
+/// let hash1 = FileHash(algorithm: .sha256, value: data1)
+/// let hash2 = FileHash(algorithm: .sha256, value: data2)
+///
+/// if hash1 == hash2 {
+///     print("Files are identical")
+/// }
+/// ```
+///
+/// Use in content-addressable storage:
+/// ```swift
+/// let hash = FileHash(algorithm: .sha256, value: fileDataHash)
+/// let storagePath = "\(hash.algorithm.rawValue)/\(hash.hexString.prefix(2))/\(hash.hexString)"
+/// ```
+///
+/// ## Properties
+///
+/// - `algorithm` - Hash algorithm used (sha256, sha1, md5)
+/// - `value` - Raw hash bytes
+/// - `hexString` - Hexadecimal string representation
+/// - `identifier` - Standard format: "sha256:abc123..."
+///
+/// ## Supported Algorithms
+///
+/// - `.sha256` - SHA-256 (recommended, secure)
+/// - `.sha1` - SHA-1 (faster, less secure)
+/// - `.md5` - MD5 (fastest, not cryptographically secure)
+///
+/// ## See Also
+///
+/// - ``FileSystemEntry`` - Files can have associated hashes
+/// - [Cryptographic Hash Function (Wikipedia)](https://en.wikipedia.org/wiki/Cryptographic_hash_function) - Overview of hash functions
+/// - [SHA-2 (Wikipedia)](https://en.wikipedia.org/wiki/SHA-2) - SHA-256 algorithm details
+/// - [MD5 (Wikipedia)](https://en.wikipedia.org/wiki/MD5) - MD5 algorithm details
 public struct FileHash: Hashable, Codable {
     /// Hash algorithm used
     public let algorithm: HashAlgorithm
@@ -102,11 +231,68 @@ public struct FileHash: Hashable, Codable {
 
 // MARK: - FileSystemEntryMetadata
 
-/// Metadata for a file system entry (file or directory)
-/// Separated from file content for efficient batch processing
-/// 
-/// Note: For special files (block devices, character devices, sockets, FIFOs),
-/// use the `specialFileType` property to store special file type information.
+/// Metadata describing a file system entry (file or directory).
+///
+/// `FileSystemEntryMetadata` separates metadata from file content, enabling
+/// fast parsing of file systems without loading all file data. This metadata
+/// is always loaded during parsing, while file content is loaded on-demand.
+///
+/// ## Usage
+///
+/// Create metadata for a file:
+/// ```swift
+/// let metadata = FileSystemEntryMetadata(
+///     name: "document.txt",
+///     size: 1024,
+///     location: FileLocation(offset: 2048, length: 1024),
+///     modificationDate: Date()
+/// )
+/// ```
+///
+/// Include hash information:
+/// ```swift
+/// let hash = FileHash(algorithm: .sha256, value: hashData)
+/// let metadata = FileSystemEntryMetadata(
+///     name: "file.dat",
+///     size: 512,
+///     hashes: [.sha256: hash]
+/// )
+/// ```
+///
+/// Access metadata properties:
+/// ```swift
+/// let entry: FileSystemEntry = // ... obtained from parser
+///
+/// print("Name: \(entry.metadata.name)")
+/// print("Size: \(entry.metadata.size) bytes")
+/// print("Modified: \(entry.metadata.modificationDate ?? Date())")
+///
+/// if let location = entry.metadata.location {
+///     print("Location: offset \(location.offset), length \(location.length)")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `name` - File or directory name
+/// - `size` - File size in bytes (0 for directories)
+/// - `location` - Physical location on disk (track, sector, offset, length)
+/// - `modificationDate` - Last modification date
+/// - `hashes` - Content hashes (SHA-256, SHA-1, MD5)
+/// - `specialFileType` - Type for special files (block device, socket, etc.)
+///
+/// ## Design Benefits
+///
+/// - **Fast Parsing**: Only metadata loaded during parsing
+/// - **Memory Efficient**: Content loaded only when accessed
+/// - **Integrity Verification**: Hashes enable content verification
+/// - **Location Tracking**: Enables on-demand content loading
+///
+/// ## See Also
+///
+/// - ``FileSystemEntry`` - Uses this metadata
+/// - ``FileLocation`` - Physical location information
+/// - ``FileHash`` - Content hash information
 public struct FileSystemEntryMetadata: Codable {
     /// File name
     public let name: String
@@ -204,6 +390,78 @@ public struct FileSystemEntryMetadata: Codable {
 /// **Architecture:** FileSystemEntry stores metadata and a reference to data (`chunkIdentifier`).
 /// The actual data access is handled by `Chunk` via `toChunk()`, which works with any ChunkStorage
 /// implementation (file system, network, cloud, memory, etc.).
+///
+/// ## Overview
+///
+/// `FileSystemEntry` represents a single file in a parsed file system. It implements
+/// the Composite Pattern as a leaf node, containing file metadata and providing
+/// on-demand access to file content.
+///
+/// ## Usage
+///
+/// Access file metadata:
+/// ```swift
+/// let file: FileSystemEntry = // ... obtained from parser
+///
+/// print("Name: \(file.name)")
+/// print("Size: \(file.size) bytes")
+/// print("Modified: \(file.modificationDate ?? Date())")
+/// ```
+///
+/// Read file content (lazy-loaded):
+/// ```swift
+/// let file: FileSystemEntry = // ... obtained from parser
+/// let diskData: RawDiskData = // ... from disk image adapter
+///
+/// // Load file content on-demand
+/// let content = try file.readData(from: diskData)
+/// print("Content: \(content.count) bytes")
+/// ```
+///
+/// Generate file hash:
+/// ```swift
+/// let file: FileSystemEntry = // ... obtained from parser
+///
+/// // Generate SHA-256 hash (cached after first call)
+/// let hash = try file.generateHash(algorithm: .sha256)
+/// print("Hash: \(hash.hexString)")
+/// ```
+///
+/// Access via chunk storage:
+/// ```swift
+/// let file: FileSystemEntry = // ... obtained from parser
+/// let chunkStorage: ChunkStorage = // ... storage provider
+///
+/// if let chunk = try await file.toChunk(storage: chunkStorage) {
+///     let data = try await chunk.readFull()
+///     print("Read \(data.count) bytes from storage")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `metadata` - File metadata (name, size, location, dates, hashes)
+/// - `chunkIdentifier` - Reference to content-addressable storage chunk
+/// - `name` - File name (from metadata)
+/// - `size` - File size in bytes (from metadata)
+/// - `modificationDate` - Last modification date (from metadata)
+/// - `specialFileType` - Type for special files (block device, socket, etc.)
+/// - `isSpecialFile` - Whether this is a special file
+/// - `parent` - Parent folder (weak reference)
+///
+/// ## Design Principles
+///
+/// - **Metadata-First**: Metadata always available, content loaded on-demand
+/// - **Lazy Loading**: File content loaded only when `readData()` is called
+/// - **Content-Addressable**: Can reference content via `chunkIdentifier`
+/// - **Caching**: Content cached after first read for performance
+///
+/// ## See Also
+///
+/// - ``FileSystemComponent`` - Base protocol
+/// - ``FileSystemEntryMetadata`` - Metadata structure
+/// - ``FileSystemFolder`` - Folder implementation
+/// - ``ChunkStorage`` - Content storage protocol
 public class FileSystemEntry: FileSystemComponent {
     /// Entry metadata (always loaded, lightweight)
     public let metadata: FileSystemEntryMetadata
@@ -355,9 +613,91 @@ public class FileSystemEntry: FileSystemComponent {
 // MARK: - FileSystemFolder
 
 /// Represents a folder/directory structure in a parsed file system.
-/// Implements Composite Pattern: can contain files and subfolders.
-/// 
-/// Note: Named `FileSystemFolder` to avoid confusion with file system directory paths.
+///
+/// `FileSystemFolder` implements the Composite Pattern, allowing it to contain
+/// both files (`FileSystemEntry`) and subfolders (`FileSystemFolder`). This
+/// enables uniform traversal and operations across the file system hierarchy.
+///
+/// ## Overview
+///
+/// Folders are composite nodes that can contain:
+/// - Files (`FileSystemEntry`) - Leaf nodes
+/// - Subfolders (`FileSystemFolder`) - Nested composite nodes
+///
+/// ## Usage
+///
+/// Navigate folder hierarchy:
+/// ```swift
+/// let rootFolder: FileSystemFolder = // ... obtained from parser
+///
+/// // Get files in root
+/// let files = rootFolder.getFiles()
+/// for file in files {
+///     print("File: \(file.name)")
+/// }
+///
+/// // Get subfolders
+/// let folders = rootFolder.getFolders()
+/// for folder in folders {
+///     print("Folder: \(folder.name)")
+/// }
+/// ```
+///
+/// Traverse recursively:
+/// ```swift
+/// // Get all components recursively
+/// let allComponents = rootFolder.traverse()
+///
+/// for component in allComponents {
+///     print("\(component.name): \(component.size) bytes")
+/// }
+/// ```
+///
+/// Find specific file:
+/// ```swift
+/// // Find file in current folder
+/// if let file = rootFolder.findChild(named: "document.txt") as? FileSystemEntry {
+///     print("Found: \(file.name)")
+/// }
+/// ```
+///
+/// Navigate to subfolder:
+/// ```swift
+/// if let subfolder = rootFolder.findChild(named: "Documents") as? FileSystemFolder {
+///     let documents = subfolder.getFiles()
+///     print("Found \(documents.count) files in Documents")
+/// }
+/// ```
+///
+/// Access parent folder:
+/// ```swift
+/// let file: FileSystemEntry = // ... a file
+///
+/// if let parent = file.parent {
+///     print("File is in: \(parent.name)")
+/// }
+/// ```
+///
+/// ## Properties
+///
+/// - `name` - Folder name
+/// - `size` - Total size of all children (computed)
+/// - `modificationDate` - Modification date if available
+/// - `parent` - Parent folder (weak reference)
+/// - `children` - Array of child components (files and subfolders)
+///
+/// ## Design Principles
+///
+/// - **Composite Pattern**: Folders can contain files and other folders
+/// - **Uniform Interface**: Files and folders share `FileSystemComponent` protocol
+/// - **Hierarchical Structure**: Parent-child relationships enable navigation
+/// - **Size Aggregation**: Folder size is sum of all children
+///
+/// ## See Also
+///
+/// - ``FileSystemComponent`` - Base protocol
+/// - ``FileSystemEntry`` - File implementation
+/// - [Composite Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Composite_pattern) - Design pattern for tree structures
 public class FileSystemFolder: FileSystemComponent {
     /// Folder name
     public let name: String

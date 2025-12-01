@@ -5,8 +5,46 @@
 
 import Foundation
 
-/// Content-addressable identifier for a binary chunk
-/// Typically hash-based for deduplication
+/// Content-addressable identifier for a binary chunk.
+///
+/// `ChunkIdentifier` uniquely identifies a chunk of binary data, typically using
+/// a cryptographic hash of the content. This enables deduplication and integrity
+/// verification.
+///
+/// ## Usage
+///
+/// Create identifier from hash:
+/// ```swift
+/// let hash = computeSHA256(data)
+/// let identifier = ChunkIdentifier(id: hash.hexString)
+/// ```
+///
+/// Create with metadata:
+/// ```swift
+/// let identifier = ChunkIdentifier(
+///     id: hash.hexString,
+///     metadata: ChunkMetadata(
+///         size: data.count,
+///         contentType: "application/octet-stream"
+///     )
+/// )
+/// ```
+///
+/// Use as dictionary key (Hashable):
+/// ```swift
+/// var chunkCache: [ChunkIdentifier: Data] = [:]
+/// chunkCache[identifier] = data
+/// ```
+///
+/// ## Properties
+///
+/// - `id` - Unique identifier (typically hash hex string)
+/// - `metadata` - Optional metadata about the chunk
+///
+/// ## See Also
+///
+/// - ``ChunkStorage`` - Storage protocol
+/// - ``ChunkMetadata`` - Chunk metadata
 public struct ChunkIdentifier: Sendable, Hashable, Codable {
     /// Unique identifier (typically hash hex string)
     public let id: String
@@ -20,7 +58,62 @@ public struct ChunkIdentifier: Sendable, Hashable, Codable {
     }
 }
 
-/// Metadata associated with a binary chunk
+/// Metadata describing a binary chunk.
+///
+/// `ChunkMetadata` provides information about a chunk including size, content type,
+/// timestamps, and compression information. This metadata helps with chunk management
+/// and optimization.
+///
+/// ## Usage
+///
+/// Create metadata for a file chunk:
+/// ```swift
+/// let metadata = ChunkMetadata(
+///     size: fileData.count,
+///     contentHash: hash.hexString,
+///     hashAlgorithm: "sha256",
+///     contentType: "application/pdf",
+///     chunkType: "file",
+///     originalFilename: "document.pdf",
+///     created: Date(),
+///     modified: Date()
+/// )
+/// ```
+///
+/// Create minimal metadata:
+/// ```swift
+/// let metadata = ChunkMetadata(size: data.count)
+/// ```
+///
+/// Include compression information:
+/// ```swift
+/// let metadata = ChunkMetadata(
+///     size: compressedData.count,
+///     compression: CompressionInfo(
+///         algorithm: "gzip",
+///         uncompressedSize: originalSize,
+///         compressedSize: compressedData.count
+///     )
+/// )
+/// ```
+///
+/// ## Properties
+///
+/// - `size` - Size of the chunk in bytes
+/// - `contentHash` - Content hash for verification
+/// - `hashAlgorithm` - Hash algorithm used
+/// - `contentType` - MIME type (e.g., "application/pdf")
+/// - `chunkType` - Type of chunk ("disk-image", "file", "stream")
+/// - `originalFilename` - Original filename if applicable
+/// - `originalPaths` - Original file paths (for deduplication tracking)
+/// - `created` - Creation timestamp
+/// - `modified` - Modification timestamp
+/// - `compression` - Compression information if applicable
+///
+/// ## See Also
+///
+/// - ``ChunkIdentifier`` - Chunk identifier
+/// - ``CompressionInfo`` - Compression details
 public struct ChunkMetadata: Sendable, Codable, Equatable, Hashable {
     /// Size of the chunk in bytes
     public let size: Int
@@ -77,7 +170,17 @@ public struct ChunkMetadata: Sendable, Codable, Equatable, Hashable {
     }
 }
 
-/// Compression information for a chunk
+/// Compression information for a chunk.
+///
+/// `CompressionInfo` describes how a chunk was compressed, including the algorithm
+/// used and the size difference between compressed and uncompressed data.
+///
+/// ## See Also
+///
+/// - ``ChunkMetadata`` - Chunk metadata container
+/// - [Data Compression (Wikipedia)](https://en.wikipedia.org/wiki/Data_compression) - Overview of compression techniques
+/// - [Gzip (Wikipedia)](https://en.wikipedia.org/wiki/Gzip) - Gzip compression format
+/// - [ZIP (file format) (Wikipedia)](https://en.wikipedia.org/wiki/ZIP_(file_format)) - ZIP compression format
 public struct CompressionInfo: Sendable, Codable, Equatable, Hashable {
     /// Compression algorithm (e.g., "gzip", "zip", "deflate")
     public let algorithm: String
@@ -95,12 +198,103 @@ public struct CompressionInfo: Sendable, Codable, Equatable, Hashable {
     }
 }
 
-/// Protocol for chunk/binary data storage operations
+/// Protocol for content-addressable binary data storage.
 ///
-/// This protocol defines the interface for storing and retrieving binary chunks.
-/// Implementations can use various storage backends (file system, cloud storage, etc.).
+/// `ChunkStorage` defines the interface for storing and retrieving binary chunks
+/// using content-addressable identifiers (typically hash-based). This enables
+/// deduplication, efficient storage, and integrity verification.
 ///
-/// **Memory Optimization**: The protocol supports lazy loading and partial reads.
+/// ## Overview
+///
+/// Chunk storage provides:
+/// - **Content-Addressable Storage**: Files identified by their content hash
+/// - **Deduplication**: Identical content stored only once
+/// - **Efficient Access**: Lazy loading and partial reads
+/// - **Multiple Backends**: File system, cloud storage, memory, etc.
+///
+/// ## Usage
+///
+/// Store a chunk:
+/// ```swift
+/// let data = "Hello, World!".data(using: .utf8)!
+/// let hash = computeSHA256(data)
+/// let identifier = ChunkIdentifier(id: hash.hexString)
+///
+/// let storedIdentifier = try await chunkStorage.writeChunk(
+///     data,
+///     identifier: identifier,
+///     metadata: ChunkMetadata(size: data.count)
+/// )
+/// ```
+///
+/// Read a chunk:
+/// ```swift
+/// let identifier = ChunkIdentifier(id: "abc123...")
+///
+/// if let data = try await chunkStorage.readChunk(identifier) {
+///     print("Read \(data.count) bytes")
+/// }
+/// ```
+///
+/// Read partial chunk (efficient for large files):
+/// ```swift
+/// let identifier = ChunkIdentifier(id: "abc123...")
+///
+/// // Read first 1KB
+/// let header = try await chunkStorage.readChunk(
+///     identifier,
+///     offset: 0,
+///     length: 1024
+/// )
+/// ```
+///
+/// Check if chunk exists:
+/// ```swift
+/// let identifier = ChunkIdentifier(id: "abc123...")
+///
+/// if try await chunkStorage.chunkExists(identifier) {
+///     print("Chunk exists")
+/// }
+/// ```
+///
+/// Get chunk size without loading:
+/// ```swift
+/// if let size = try await chunkStorage.chunkSize(identifier) {
+///     print("Chunk size: \(size) bytes")
+/// }
+/// ```
+///
+/// Use chunk handle for random access:
+/// ```swift
+/// if let handle = try await chunkStorage.chunkHandle(identifier) {
+///     // Read specific range
+///     let data = try await handle.read(range: 0..<1024)
+///     // ... use data ...
+///     try await handle.close()
+/// }
+/// ```
+///
+/// ## Memory Optimization
+///
+/// The protocol supports efficient memory usage:
+/// - **Lazy Loading**: Chunks loaded only when accessed
+/// - **Partial Reads**: Read only needed portions of large files
+/// - **Handle-Based Access**: Random access without loading entire chunk
+///
+/// ## Implementations
+///
+/// Common implementations include:
+/// - `FileSystemChunkStorage` - File system-based storage
+/// - `MemoryChunkStorage` - In-memory storage (for testing)
+/// - `CloudChunkStorage` - Cloud storage backends
+///
+/// ## See Also
+///
+/// - ``ChunkIdentifier`` - Content-addressable identifier
+/// - ``ChunkMetadata`` - Chunk metadata
+/// - ``ChunkHandle`` - Handle for random access
+/// - [Content-Addressable Storage (Wikipedia)](https://en.wikipedia.org/wiki/Content-addressable_storage) - Overview of content-addressable storage systems
+/// - [Data Deduplication (Wikipedia)](https://en.wikipedia.org/wiki/Data_deduplication) - Techniques for eliminating duplicate data
 public protocol ChunkStorage: Sendable {
     /// Write/store binary chunk
     ///

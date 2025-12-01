@@ -8,7 +8,7 @@ Add FileSystemKit to your Swift Package Manager dependencies:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/rickhohler/FileSystemKit.git", from: "1.4.0")
+    .package(url: "https://github.com/rickhohler/FileSystemKit.git", from: "1.5.0")
 ]
 ```
 
