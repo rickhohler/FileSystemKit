@@ -296,19 +296,16 @@ private final class HashHolder: @unchecked Sendable {
 /// Extension to integrate hash cache with file processing
 extension FileHashCache {
     /// Compute hash for a file, using cache if available
-    /// This is a synchronous wrapper that checks cache first, then computes if needed
-    public nonisolated func computeHashSync(for url: URL, data: Data, hashAlgorithm: String) throws -> String {
-        // Check cache first (synchronous check using semaphore)
-        let semaphore = DispatchSemaphore(value: 0)
-        let hashHolder = HashHolder()
-        
-        Task {
-            hashHolder.value = await getHash(for: url)
-            semaphore.signal()
-        }
-        semaphore.wait()
-        
-        if let cachedHash = hashHolder.value {
+    /// Properly async implementation
+    /// - Parameters:
+    ///   - url: File URL
+    ///   - data: File data
+    ///   - hashAlgorithm: Hash algorithm name
+    /// - Returns: Computed hash string
+    /// - Throws: SnugError if algorithm is unsupported
+    public func computeHash(for url: URL, data: Data, hashAlgorithm: String) async throws -> String {
+        // Check cache first (actor isolation requires await)
+        if let cachedHash = await getHash(for: url) {
             return cachedHash
         }
         
@@ -320,25 +317,24 @@ extension FileHashCache {
         let fileSize = Int64(data.count)
         let modificationTime = attributes?[.modificationDate] as? Date ?? Date()
         
-        // Store in cache (async, fire and forget)
-        Task {
-            await setHash(hash, for: url, fileSize: fileSize, modificationTime: modificationTime)
-        }
+        // Store in cache (actor isolation requires await)
+        await setHash(hash, for: url, fileSize: fileSize, modificationTime: modificationTime)
         
         return hash
     }
     
     /// Compute hash for data using specified algorithm
+    /// Thread-safe: Pure function, no shared state
+    /// Uses FileSystemKit's core HashComputation for unified implementation
     private nonisolated func computeHash(data: Data, algorithm: String) throws -> String {
-        switch algorithm.lowercased() {
-        case "sha256":
-            return data.sha256().map { String(format: "%02x", $0) }.joined()
-        case "sha1":
-            return data.sha1().map { String(format: "%02x", $0) }.joined()
-        case "md5":
-            return data.md5().map { String(format: "%02x", $0) }.joined()
-        default:
-            throw SnugError.unsupportedHashAlgorithm(algorithm)
+        do {
+            return try HashComputation.computeHashHex(data: data, algorithm: algorithm)
+        } catch let error as FileSystemError {
+            // Convert FileSystemError to SnugError for consistency
+            if case .hashNotImplemented(let alg) = error {
+                throw SnugError.unsupportedHashAlgorithm(alg ?? algorithm)
+            }
+            throw SnugError.storageError("Hash computation failed", error)
         }
     }
 }

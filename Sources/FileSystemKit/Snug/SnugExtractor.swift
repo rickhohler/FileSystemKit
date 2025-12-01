@@ -79,27 +79,16 @@ public class SnugExtractor {
         self.chunkStorage = chunkStorage
     }
     
-    // Synchronous wrapper for async operations
-    public func extractArchive(from archiveURL: URL, to outputURL: URL, verbose: Bool, preservePermissions: Bool = false) throws {
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultHolder = ExtractionResultHolder()
-        let storage = chunkStorage
-        
-        Task { @Sendable [storage, archiveURL, outputURL, verbose, preservePermissions, resultHolder] in
-            do {
-                try await Self.extractArchiveAsync(from: archiveURL, to: outputURL, verbose: verbose, storage: storage, preservePermissions: preservePermissions)
-                semaphore.signal()
-            } catch {
-                resultHolder.error = error
-                semaphore.signal()
-            }
-        }
-        
-        semaphore.wait()
-        
-        if let error = resultHolder.error {
-            throw error
-        }
+    /// Extract archive from archive URL to output directory
+    /// - Parameters:
+    ///   - archiveURL: URL of the archive file
+    ///   - outputURL: Directory to extract files to
+    ///   - verbose: Whether to print progress
+    ///   - preservePermissions: Whether to preserve file permissions
+    /// - Throws: Error if extraction fails
+    /// Thread-safe: Properly async implementation
+    public func extractArchive(from archiveURL: URL, to outputURL: URL, verbose: Bool, preservePermissions: Bool = false) async throws {
+        try await Self.extractArchiveAsync(from: archiveURL, to: outputURL, verbose: verbose, storage: chunkStorage, preservePermissions: preservePermissions)
     }
     
     private static func extractArchiveAsync(from archiveURL: URL, to outputURL: URL, verbose: Bool, storage: ChunkStorage, preservePermissions: Bool = false) async throws {
@@ -125,74 +114,74 @@ public class SnugExtractor {
             
             do {
                 if entry.type == "directory" {
-                // Create directory
-                try FileManager.default.createDirectory(
-                    at: entryURL,
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
-                
-                // Preserve permissions if requested
-                if preservePermissions {
-                    applyPermissions(to: entryURL, from: entry)
+                    // Create directory
+                    try FileManager.default.createDirectory(
+                        at: entryURL,
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
+                    
+                    // Preserve permissions if requested
+                    if preservePermissions {
+                        applyPermissions(to: entryURL, from: entry)
+                    }
+                    
+                    if verbose {
+                        print("  Created directory: \(entry.path)")
+                    }
+                } else if entry.type == "symlink", let target = entry.target {
+                    // Create symlink
+                    // Create parent directory if needed
+                    try FileManager.default.createDirectory(
+                        at: entryURL.deletingLastPathComponent(),
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
+                    
+                    // Remove existing file/symlink if it exists
+                    if FileManager.default.fileExists(atPath: entryURL.path) {
+                        try FileManager.default.removeItem(at: entryURL)
+                    }
+                    
+                    // Create symlink
+                    try FileManager.default.createSymbolicLink(
+                        atPath: entryURL.path,
+                        withDestinationPath: target
+                    )
+                    
+                    if verbose {
+                        print("  Created symlink: \(entry.path) -> \(target)")
+                    }
+                } else if entry.type == "file", let hash = entry.hash {
+                    // Resolve hash and extract file
+                    let identifier = ChunkIdentifier(id: hash)
+                    
+                    // Read chunk from storage
+                    guard let fileData = try await storage.readChunk(identifier) else {
+                        throw SnugError.hashNotFound(hash)
+                    }
+                    
+                    // Create parent directory if needed
+                    try FileManager.default.createDirectory(
+                        at: entryURL.deletingLastPathComponent(),
+                        withIntermediateDirectories: true,
+                        attributes: nil
+                    )
+                    
+                    // Write file
+                    try fileData.write(to: entryURL)
+                    
+                    // Preserve permissions if requested
+                    if preservePermissions {
+                        applyPermissions(to: entryURL, from: entry)
+                    }
+                    
+                    if verbose {
+                        print("  Extracted: \(entry.path) (\(hash.prefix(8))...)")
+                    }
+                    
+                    extractedCount += 1
                 }
-                
-                if verbose {
-                    print("  Created directory: \(entry.path)")
-                }
-            } else if entry.type == "symlink", let target = entry.target {
-                // Create symlink
-                // Create parent directory if needed
-                try FileManager.default.createDirectory(
-                    at: entryURL.deletingLastPathComponent(),
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
-                
-                // Remove existing file/symlink if it exists
-                if FileManager.default.fileExists(atPath: entryURL.path) {
-                    try FileManager.default.removeItem(at: entryURL)
-                }
-                
-                // Create symlink
-                try FileManager.default.createSymbolicLink(
-                    atPath: entryURL.path,
-                    withDestinationPath: target
-                )
-                
-                if verbose {
-                    print("  Created symlink: \(entry.path) -> \(target)")
-                }
-            } else if entry.type == "file", let hash = entry.hash {
-                // Resolve hash and extract file
-                let identifier = ChunkIdentifier(id: hash)
-                
-                // Read chunk from storage
-                guard let fileData = try await storage.readChunk(identifier) else {
-                    throw SnugError.hashNotFound(hash)
-                }
-                
-                // Create parent directory if needed
-                try FileManager.default.createDirectory(
-                    at: entryURL.deletingLastPathComponent(),
-                    withIntermediateDirectories: true,
-                    attributes: nil
-                )
-                
-                // Write file
-                try fileData.write(to: entryURL)
-                
-                // Preserve permissions if requested
-                if preservePermissions {
-                    applyPermissions(to: entryURL, from: entry)
-                }
-                
-                if verbose {
-                    print("  Extracted: \(entry.path) (\(hash.prefix(8))...)")
-                }
-                }
-                
-                extractedCount += 1
             } catch {
                 errorCount += 1
                 let errorMsg = "Failed to extract \(entry.path): \(error.localizedDescription)"
@@ -230,11 +219,6 @@ public class SnugExtractor {
     }
 }
 
-// Helper class for thread-safe error storage
-private final class ExtractionResultHolder: @unchecked Sendable {
-    var error: Error?
-}
-
 // Helper function to apply permissions from archive entry
 private func applyPermissions(to url: URL, from entry: ArchiveEntry) {
     // Apply file permissions (Unix-style)
@@ -260,5 +244,3 @@ private func parseOctalPermissions(_ permissions: String) -> Int? {
     }
     return Int(trimmed, radix: 8)
 }
-
-

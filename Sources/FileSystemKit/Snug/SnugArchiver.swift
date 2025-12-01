@@ -1,25 +1,14 @@
 // FileSystemKit - SNUG Archive Creation
-// Creates .snug archives from directories
+// SnugArchiver - Main class for creating SNUG archives
+//
+// NOTE: This file has been refactored. Components are now in:
+// - Processing/DirectoryProcessor.swift - Directory traversal and file processing
+// - Utilities/ProgressReporter.swift - Progress reporting
+// - Utilities/SnugHashComputation.swift - Hash computation wrapper
+// - Utilities/CompressionHelpers.swift - Compression utilities
 
 import Foundation
 import Yams
-#if canImport(Darwin)
-import Darwin
-#elseif canImport(Glibc)
-import Glibc
-#endif
-#if canImport(Compression)
-import Compression
-#endif
-#if canImport(CommonCrypto)
-import CommonCrypto
-#endif
-#if canImport(CryptoKit)
-import CryptoKit
-#endif
-
-// Import core types for directory parsing and file operations
-// These are in the same module, so they're available, but explicit imports help with clarity
 
 /// Creates SNUG archives from directory structures
 public class SnugArchiver {
@@ -91,6 +80,7 @@ public class SnugArchiver {
         self.progressCallback = callback
     }
     
+    /// Create archive from source directory
     public func createArchive(
         from sourceURL: URL,
         outputURL: URL,
@@ -101,9 +91,11 @@ public class SnugArchiver {
         embedSystemFiles: Bool = false,
         skipPermissionErrors: Bool = false,
         ignoreMatcher: SnugIgnoreMatcher? = nil
-    ) throws -> SnugArchiveStats {
+    ) async throws -> SnugArchiveStats {
+        let progressReporter = ProgressReporter(callback: progressCallback)
+        
         // Report scanning phase
-        reportProgress(
+        progressReporter.report(
             filesProcessed: 0,
             totalFiles: nil,
             bytesProcessed: 0,
@@ -123,7 +115,7 @@ public class SnugArchiver {
         let totalFileCount = try FileCounter.countFiles(in: sourceURL, ignoreMatcher: ignoreMatcher)
         
         // Report processing phase
-        reportProgress(
+        progressReporter.report(
             filesProcessed: 0,
             totalFiles: totalFileCount,
             bytesProcessed: 0,
@@ -132,8 +124,15 @@ public class SnugArchiver {
             phase: .processing
         )
         
-        // Process directory (concurrent processing infrastructure prepared for future implementation)
-        try processDirectory(
+        // Process directory
+        let directoryProcessor = DirectoryProcessor(
+            hashAlgorithm: hashAlgorithm,
+            hashCache: hashCache,
+            chunkStorage: chunkStorage,
+            progressReporter: progressReporter
+        )
+        
+        try await directoryProcessor.processDirectory(
             at: sourceURL,
             basePath: "",
             entries: &entries,
@@ -260,7 +259,7 @@ public class SnugArchiver {
         }
         
         // 6. Compress entire archive
-        let compressedData = try compressGzip(data: archiveData)
+        let compressedData = try SnugCompressionHelpers.compressGzip(data: archiveData)
         
         // 7. Write compressed file
         try compressedData.write(to: outputURL)
@@ -270,7 +269,7 @@ public class SnugArchiver {
         let embeddedCount = embeddedFiles.count
         
         // Report completion
-        reportProgress(
+        progressReporter.report(
             filesProcessed: fileCount,
             totalFiles: fileCount,
             bytesProcessed: Int64(totalSize),
@@ -293,646 +292,5 @@ public class SnugArchiver {
             totalSize: totalSize
         )
     }
-    
-    // Helper function to count files for progress estimation
-    
-    // Helper function to report progress
-    private func reportProgress(
-        filesProcessed: Int,
-        totalFiles: Int?,
-        bytesProcessed: Int64,
-        totalBytes: Int64?,
-        currentFile: String?,
-        phase: ProgressPhase
-    ) {
-        let progress = SnugProgress(
-            filesProcessed: filesProcessed,
-            totalFiles: totalFiles,
-            bytesProcessed: bytesProcessed,
-            totalBytes: totalBytes,
-            currentFile: currentFile,
-            phase: phase
-        )
-        progressCallback?(progress)
-    }
-    
-    private func processDirectory(
-        at url: URL,
-        basePath: String,
-        entries: inout [ArchiveEntry],
-        hashRegistry: inout [String: HashDefinition],
-        processedHashes: inout Set<String>,
-        totalSize: inout Int,
-        embeddedFiles: inout [(hash: String, data: Data, path: String)],
-        totalFileCount: Int,
-        verbose: Bool,
-        followExternalSymlinks: Bool = false,
-        errorOnBrokenSymlinks: Bool = false,
-        preserveSymlinks: Bool = false,
-        embedSystemFiles: Bool = false,
-        skipPermissionErrors: Bool = false,
-        ignoreMatcher: SnugIgnoreMatcher? = nil
-    ) throws {
-        let archiveRootURL = url.resolvingSymlinksInPath()
-        var visitedCanonicalPaths: Set<String> = []
-        
-        let resourceKeys: [URLResourceKey] = [
-            .isDirectoryKey,
-            .isSymbolicLinkKey,
-            .isRegularFileKey,
-            .hasHiddenExtensionKey,
-            .isUserImmutableKey,
-            .isSystemImmutableKey,
-            .fileSizeKey,
-            .contentModificationDateKey,
-            .creationDateKey,
-            .isExecutableKey
-        ]
-        
-        // FileManager enumerator follows symlinks by default, but we need to handle them explicitly
-        let enumeratorOptions: FileManager.DirectoryEnumerationOptions = preserveSymlinks
-            ? [.skipsHiddenFiles]  // Don't follow symlinks when preserving
-            : [.skipsHiddenFiles]   // Will follow symlinks, but we'll handle cycle detection
-        
-        let enumerator = FileManager.default.enumerator(
-            at: url,
-            includingPropertiesForKeys: resourceKeys,
-            options: enumeratorOptions,
-            errorHandler: { (url, error) -> Bool in
-                if verbose {
-                    print("  Warning: Error enumerating \(url.path): \(error.localizedDescription)")
-                }
-                return true  // Continue on error
-            }
-        )
-        
-        guard let enumerator = enumerator else {
-            throw SnugError.storageError("Failed to enumerate directory", nil)
-        }
-        
-        var filesProcessed = 0
-        
-        for case let fileURL as URL in enumerator {
-            // Normalize path to Unix-style (handle Windows paths)
-            let relativePath = PathUtilities.relativePath(from: fileURL, baseURL: url, basePath: basePath)
-            
-            // Check ignore patterns
-            if let matcher = ignoreMatcher, matcher.shouldIgnore(relativePath) {
-                if verbose {
-                    print("  Ignored: \(relativePath)")
-                }
-                continue
-            }
-            
-            let resourceValues = try fileURL.resourceValues(forKeys: Set(resourceKeys))
-            let isDirectory = resourceValues.isDirectory ?? false
-            let isSymlink = resourceValues.isSymbolicLink ?? false
-            let isRegularFile = resourceValues.isRegularFile ?? false
-            let isHidden = resourceValues.hasHiddenExtension ?? false
-            let isSystem = resourceValues.isSystemImmutable ?? false
-            
-            // Detect special files (block devices, character devices, sockets, FIFOs)
-            // URLResourceValues doesn't provide these, so we use stat() system call
-            let specialFileInfo = detectSpecialFileType(at: fileURL)
-            
-            // Handle symlinks
-            if isSymlink {
-                if preserveSymlinks {
-                    // Preserve symlink mode: store symlink entry
-                    do {
-                        let symlinkTarget = try FileManager.default.destinationOfSymbolicLink(atPath: fileURL.path)
-                        let entry = ArchiveEntry(
-                            type: "symlink",
-                            path: relativePath,
-                            hash: nil,
-                            size: nil,
-                            target: symlinkTarget,
-                            permissions: nil,
-                            owner: nil,
-                            group: nil,
-                            modified: resourceValues.contentModificationDate,
-                            created: resourceValues.creationDate,
-                            embedded: false,
-                            embeddedOffset: nil
-                        )
-                        entries.append(entry)
-                        if verbose {
-                            print("  Added symlink: \(relativePath) -> \(symlinkTarget)")
-                        }
-                        continue
-                    } catch {
-                        if errorOnBrokenSymlinks {
-                            throw SnugError.brokenSymlink(relativePath, target: "")
-                        } else {
-                            if verbose {
-                                print("  Warning: Skipping broken symlink: \(relativePath)")
-                            }
-                            continue
-                        }
-                    }
-                } else {
-                    // Follow symlink mode: resolve and process target
-                    do {
-                        let symlinkTarget = try FileManager.default.destinationOfSymbolicLink(atPath: fileURL.path)
-                        let resolvedURL: URL
-                        
-                        // Handle relative vs absolute symlink targets
-                        if symlinkTarget.hasPrefix("/") {
-                            resolvedURL = URL(fileURLWithPath: symlinkTarget).resolvingSymlinksInPath()
-                        } else {
-                            resolvedURL = URL(fileURLWithPath: symlinkTarget, relativeTo: fileURL.deletingLastPathComponent())
-                                .resolvingSymlinksInPath()
-                        }
-                        
-                        // Check for broken symlink
-                        if !FileManager.default.fileExists(atPath: resolvedURL.path) {
-                            if errorOnBrokenSymlinks {
-                                throw SnugError.brokenSymlink(relativePath, target: symlinkTarget)
-                            } else {
-                                if verbose {
-                                    print("  Warning: Skipping broken symlink: \(relativePath) -> \(symlinkTarget)")
-                                }
-                                continue
-                            }
-                        }
-                        
-                        // Check for cycle
-                        let canonicalPath = resolvedURL.path
-                        if visitedCanonicalPaths.contains(canonicalPath) {
-                            if verbose {
-                                print("  Warning: Skipping symlink cycle: \(relativePath)")
-                            }
-                            continue
-                        }
-                        
-                        // Check if symlink points outside archive root
-                        if !canonicalPath.hasPrefix(archiveRootURL.path) {
-                            if followExternalSymlinks {
-                                visitedCanonicalPaths.insert(canonicalPath)
-                                // Process external file - continue to file processing below
-                                // Note: The enumerator may have already followed it
-                            } else {
-                                if verbose {
-                                    print("  Warning: Skipping symlink pointing outside archive: \(relativePath)")
-                                }
-                                continue
-                            }
-                        } else {
-                            visitedCanonicalPaths.insert(canonicalPath)
-                        }
-                        
-                        // Check if resolved path is a directory (will be handled by enumerator)
-                        let resolvedResourceValues = try resolvedURL.resourceValues(forKeys: Set(resourceKeys))
-                        if resolvedResourceValues.isDirectory ?? false {
-                            // Directory symlink - will be handled by enumerator, skip here
-                            continue
-                        }
-                        
-                        // Process resolved file - use resolvedURL instead of fileURL
-                        // Note: We need to read from resolvedURL, but keep relativePath for entry
-                        let fileData = try Data(contentsOf: resolvedURL)
-                        totalSize += fileData.count
-                        let hash = try hashCache.computeHashSync(for: resolvedURL, data: fileData, hashAlgorithm: hashAlgorithm)
-                        
-                        // Store file in chunk storage (synchronous wrapper)
-                        let identifier = ChunkIdentifier(id: hash)
-                        
-                        // Get file timestamps
-                        let createdDate = try? resolvedURL.resourceValues(forKeys: [.creationDateKey]).creationDate
-                        let modifiedDate = try? resolvedURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-                        
-                        // Detect if this is a disk image file
-                        let typeInfo = FileTypeDetector.detect(for: resolvedURL, data: fileData)
-                        let chunkType = typeInfo.type
-                        let contentType = typeInfo.contentType
-                        
-                        let resolvedChunkMetadata = ChunkMetadata(
-                            size: fileData.count,
-                            contentHash: hash,
-                            hashAlgorithm: hashAlgorithm,
-                            contentType: contentType,
-                            chunkType: chunkType,
-                            originalFilename: resolvedURL.lastPathComponent,
-                            originalPaths: [relativePath],
-                            created: createdDate,
-                            modified: modifiedDate
-                        )
-                        
-                        let semaphore = DispatchSemaphore(value: 0)
-                        let errorHolder = ErrorHolder()
-                        
-                        Task { [chunkStorage] in
-                            do {
-                                _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: resolvedChunkMetadata)
-                                semaphore.signal()
-                            } catch {
-                                errorHolder.error = error
-                                semaphore.signal()
-                            }
-                        }
-                        
-                        semaphore.wait()
-                        
-                        if let error = errorHolder.error {
-                            throw error
-                        }
-                        
-                        // Add to hash registry if not already present
-                        if !processedHashes.contains(hash) {
-                            hashRegistry[hash] = HashDefinition(
-                                hash: hash,
-                                size: fileData.count,
-                                algorithm: hashAlgorithm
-                            )
-                            processedHashes.insert(hash)
-                        }
-                        
-                        // File entry (from followed symlink)
-                        let entry = ArchiveEntry(
-                            type: "file",
-                            path: relativePath,
-                            hash: hash,
-                            size: fileData.count,
-                            target: nil,
-                            permissions: FileMetadataCollector.getPermissions(from: resolvedURL),
-                            owner: FileMetadataCollector.getOwnerAndGroup(from: resolvedURL).owner,
-                            group: FileMetadataCollector.getOwnerAndGroup(from: resolvedURL).group,
-                            modified: resourceValues.contentModificationDate,
-                            created: resourceValues.creationDate,
-                            embedded: false,
-                            embeddedOffset: nil
-                        )
-                        entries.append(entry)
-                        
-                        filesProcessed += 1
-                        reportProgress(
-                            filesProcessed: filesProcessed,
-                            totalFiles: totalFileCount,
-                            bytesProcessed: Int64(totalSize),
-                            totalBytes: nil,
-                            currentFile: relativePath,
-                            phase: .processing
-                        )
-                        
-                        if verbose {
-                            print("  Added (from symlink): \(relativePath) (\(hash.prefix(8))...)")
-                        }
-                        continue
-                    } catch let error as SnugError {
-                        throw error
-                    } catch {
-                        if errorOnBrokenSymlinks {
-                            throw SnugError.brokenSymlink(relativePath, target: "")
-                        } else {
-                            if verbose {
-                                print("  Warning: Error resolving symlink \(relativePath): \(error.localizedDescription)")
-                            }
-                            continue
-                        }
-                    }
-                }
-            }
-            
-            // Handle special files (devices, sockets, FIFOs)
-            if let specialInfo = specialFileInfo {
-                if embedSystemFiles {
-                    // Store special file metadata entry
-                    guard let specialType = specialInfo.typeString else {
-                        // This shouldn't happen, but handle gracefully
-                        if verbose {
-                            print("  Warning: Unknown special file type: \(relativePath)")
-                        }
-                        continue
-                    }
-                    
-                    let entry = ArchiveEntry(
-                        type: specialType,
-                        path: relativePath,
-                        hash: nil,
-                        size: nil,
-                        target: nil,
-                        permissions: nil,
-                        owner: nil,
-                        group: nil,
-                        modified: resourceValues.contentModificationDate,
-                        created: resourceValues.creationDate,
-                        embedded: false,
-                        embeddedOffset: nil
-                    )
-                    entries.append(entry)
-                    
-                    if verbose {
-                        print("  Added special file (\(specialType)): \(relativePath)")
-                    }
-                } else {
-                    // Skip special files with warning
-                    if verbose {
-                        print("  Warning: Skipping \(specialInfo.description): \(relativePath)")
-                    }
-                }
-                continue
-            }
-            
-            // Normal file/directory processing
-            if isDirectory {
-                // Directory entry
-                let entry = ArchiveEntry(
-                    type: "directory",
-                    path: relativePath,
-                    hash: nil,
-                    size: nil,
-                    target: nil,
-                    permissions: nil,
-                    owner: nil,
-                    group: nil,
-                    modified: resourceValues.contentModificationDate,
-                    created: resourceValues.creationDate,
-                    embedded: false,
-                    embeddedOffset: nil
-                )
-                entries.append(entry)
-            } else if isRegularFile {
-                // Regular file entry - try to read
-                do {
-                    let fileData = try Data(contentsOf: fileURL)
-                    totalSize += fileData.count
-                    
-                    // Use hash cache if available
-                    let hash = try hashCache.computeHashSync(for: fileURL, data: fileData, hashAlgorithm: hashAlgorithm)
-                    
-                    // Determine if this should be embedded (system files when embedSystemFiles is true)
-                    let shouldEmbed = embedSystemFiles && (isSystem || isHidden || PathUtilities.isSystemFile(relativePath))
-                    
-                    if shouldEmbed {
-                        // Embed file directly in archive
-                        embeddedFiles.append((hash: hash, data: fileData, path: relativePath))
-                        
-                        let metadata = FileMetadataCollector.collect(from: fileURL)
-                        let entry = ArchiveEntry(
-                            type: "file",
-                            path: relativePath,
-                            hash: hash,
-                            size: fileData.count,
-                            target: nil,
-                            permissions: metadata.permissions,
-                            owner: metadata.owner,
-                            group: metadata.group,
-                            modified: metadata.modified ?? resourceValues.contentModificationDate,
-                            created: metadata.created ?? resourceValues.creationDate,
-                            embedded: true,
-                            embeddedOffset: nil  // Will be set later
-                        )
-                        entries.append(entry)
-                        
-                        filesProcessed += 1
-                        reportProgress(
-                            filesProcessed: filesProcessed,
-                            totalFiles: totalFileCount,
-                            bytesProcessed: Int64(totalSize),
-                            totalBytes: nil,
-                            currentFile: relativePath,
-                            phase: .processing
-                        )
-                        
-                        if verbose {
-                            print("  Added (embedded): \(relativePath) (\(hash.prefix(8))...)")
-                        }
-                    } else {
-                        // Store in hash storage (normal behavior)
-                
-                // Store file in chunk storage (synchronous wrapper)
-                let identifier = ChunkIdentifier(id: hash)
-                
-                // Get file timestamps
-                let createdDate = try? fileURL.resourceValues(forKeys: [.creationDateKey]).creationDate
-                let modifiedDate = try? fileURL.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
-                
-                // Detect if this is a disk image file
-                let typeInfo = FileTypeDetector.detect(for: fileURL, data: fileData)
-                let chunkType = typeInfo.type
-                let contentType = typeInfo.contentType
-                
-                let chunkMetadata = ChunkMetadata(
-                    size: fileData.count,
-                    contentHash: hash,
-                    hashAlgorithm: hashAlgorithm,
-                    contentType: contentType,
-                    chunkType: chunkType,
-                    originalFilename: fileURL.lastPathComponent,
-                    originalPaths: [relativePath],
-                    created: createdDate,
-                    modified: modifiedDate
-                )
-                
-                let semaphore = DispatchSemaphore(value: 0)
-                let errorHolder = ErrorHolder()
-                
-                Task { [chunkStorage] in
-                    do {
-                        _ = try await chunkStorage.writeChunk(fileData, identifier: identifier, metadata: chunkMetadata)
-                        semaphore.signal()
-                    } catch {
-                        errorHolder.error = error
-                        semaphore.signal()
-                    }
-                }
-                
-                semaphore.wait()
-                
-                if let error = errorHolder.error {
-                    throw error
-                }
-                
-                // Add to hash registry if not already present
-                if !processedHashes.contains(hash) {
-                    hashRegistry[hash] = HashDefinition(
-                        hash: hash,
-                        size: fileData.count,
-                        algorithm: hashAlgorithm
-                    )
-                    processedHashes.insert(hash)
-                }
-                
-                // File entry (hash storage)
-                let fileMetadata = FileMetadataCollector.collect(from: fileURL)
-                let entry = ArchiveEntry(
-                    type: "file",
-                    path: relativePath,
-                    hash: hash,
-                    size: fileData.count,
-                    target: nil,
-                    permissions: fileMetadata.permissions,
-                    owner: fileMetadata.owner,
-                    group: fileMetadata.group,
-                    modified: fileMetadata.modified ?? resourceValues.contentModificationDate,
-                    created: fileMetadata.created ?? resourceValues.creationDate,
-                    embedded: false,
-                    embeddedOffset: nil
-                )
-                        entries.append(entry)
-                        
-                        filesProcessed += 1
-                        reportProgress(
-                            filesProcessed: filesProcessed,
-                            totalFiles: totalFileCount,
-                            bytesProcessed: Int64(totalSize),
-                            totalBytes: nil,
-                            currentFile: relativePath,
-                            phase: .processing
-                        )
-                        
-                        if verbose {
-                            print("  Added: \(relativePath) (\(hash.prefix(8))...)")
-                        }
-                    }
-                } catch CocoaError.fileReadNoPermission {
-                    // Permission denied - throw error by default (requires user permission/action)
-                    if skipPermissionErrors {
-                        // Skip with warning only if explicitly allowed
-                        if verbose {
-                            print("  Warning: Permission denied, skipping: \(relativePath)")
-                        }
-                        continue
-                    } else {
-                        // Default: throw error (user must grant permission or use --skip-permission-errors)
-                        throw SnugError.permissionDenied(relativePath)
-                    }
-                } catch {
-                    // Other read errors - throw by default
-                    if skipPermissionErrors {
-                        // Skip with warning only if explicitly allowed
-                        if verbose {
-                            print("  Warning: Error reading \(relativePath): \(error.localizedDescription)")
-                        }
-                        continue
-                    } else {
-                        // Default: throw error
-                        throw error
-                    }
-                }
-            }
-        }
-    }
-    
-    private func computeHash(data: Data) throws -> String {
-        switch hashAlgorithm.lowercased() {
-        case "sha256":
-            return data.sha256().map { String(format: "%02x", $0) }.joined()
-        case "sha1":
-            return data.sha1().map { String(format: "%02x", $0) }.joined()
-        case "md5":
-            return data.md5().map { String(format: "%02x", $0) }.joined()
-        default:
-            throw SnugError.unsupportedHashAlgorithm(hashAlgorithm)
-        }
-    }
-    
-    private func compressGzip(data: Data) throws -> Data {
-        #if canImport(Compression)
-        let bufferSize = data.count + (data.count / 10) + 16
-        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
-        defer { destinationBuffer.deallocate() }
-        
-        let compressedSize = data.withUnsafeBytes { sourceBuffer -> Int in
-            guard let baseAddress = sourceBuffer.baseAddress else {
-                return 0
-            }
-            return compression_encode_buffer(
-                destinationBuffer,
-                bufferSize,
-                baseAddress.assumingMemoryBound(to: UInt8.self),
-                data.count,
-                nil,
-                COMPRESSION_LZFSE
-            )
-        }
-        
-        guard compressedSize > 0 else {
-            throw SnugError.compressionFailed("Compression returned zero size", nil)
-        }
-        
-        return Data(bytes: destinationBuffer, count: compressedSize)
-        #else
-        throw SnugError.compressionFailed("Compression not available on this platform", nil)
-        #endif
-    }
 }
 
-// MARK: - Hash Extensions
-
-extension Data {
-    func sha256() -> [UInt8] {
-        #if canImport(CommonCrypto)
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-        self.withUnsafeBytes { bytes in
-            _ = CC_SHA256(bytes.baseAddress, CC_LONG(self.count), &hash)
-        }
-        return hash
-        #elseif canImport(CryptoKit)
-        let hash = SHA256.hash(data: self)
-        return Array(hash)
-        #else
-        return []
-        #endif
-    }
-    
-    func sha1() -> [UInt8] {
-        #if canImport(CommonCrypto)
-        var hash = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-        self.withUnsafeBytes { bytes in
-            _ = CC_SHA1(bytes.baseAddress, CC_LONG(self.count), &hash)
-        }
-        return hash
-        #elseif canImport(CryptoKit)
-        let hash = Insecure.SHA1.hash(data: self)
-        return Array(hash)
-        #else
-        return []
-        #endif
-    }
-    
-    func md5() -> [UInt8] {
-        #if canImport(CryptoKit)
-        // Use CryptoKit's Insecure.MD5 - explicitly marked as insecure for legacy compatibility
-        // This is Apple's recommended way to use MD5 (read-only validation, companion files)
-        let hash = Insecure.MD5.hash(data: self)
-        return Array(hash)
-        #elseif canImport(CommonCrypto)
-        // Fallback: Use CommonCrypto (deprecated but kept for legacy compatibility)
-        // MD5 is intentionally kept for legacy compatibility (companion files, existing checksums)
-        // See HASH_ALGORITHM_POLICY.md for details
-        // Note: CC_MD5 deprecation warning is intentional - MD5 is read-only legacy support
-        var hash = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-        self.withUnsafeBytes { bytes in
-            hash.withUnsafeMutableBytes { hashBytes in
-                // Using deprecated CC_MD5 intentionally for legacy compatibility
-                _ = CC_MD5(bytes.baseAddress, CC_LONG(self.count), hashBytes.baseAddress)
-            }
-        }
-        return hash
-        #else
-        return []
-        #endif
-    }
-}
-
-// MARK: - SnugArchiver Chunk Type Detection Extension
-
-
-
-// MARK: - Helper Classes
-
-// Helper class for thread-safe error storage
-private final class ErrorHolder: @unchecked Sendable {
-    var error: Error?
-}
-
-// Helper class for thread-safe processing result storage
-private final class ProcessingResultHolder: @unchecked Sendable {
-    var entries: [ArchiveEntry] = []
-    var hashRegistry: [String: HashDefinition] = [:]
-    var processedHashes: Set<String> = []
-    var totalSize: Int = 0
-    var embeddedFiles: [(hash: String, data: Data, path: String)] = []
-    var error: Error?
-}

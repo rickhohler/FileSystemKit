@@ -76,11 +76,14 @@ public protocol DiskImageAdapter: AnyObject {
 
 // MARK: - DiskImageAdapterRegistry
 
-/// Registry for disk image adapters
-/// Uses singleton pattern to manage available adapters
-public final class DiskImageAdapterRegistry {
+/// Thread-safe registry for disk image adapters
+/// Uses NSLock for synchronization to support concurrent access
+public final class DiskImageAdapterRegistry: @unchecked Sendable {
     /// Shared singleton instance
-    public static nonisolated(unsafe) let shared = DiskImageAdapterRegistry()
+    public static let shared = DiskImageAdapterRegistry()
+    
+    /// Lock for thread-safe access
+    private let lock = NSLock()
     
     /// Registered adapters by format
     private var adapters: [DiskImageFormat: DiskImageAdapter.Type] = [:]
@@ -88,18 +91,47 @@ public final class DiskImageAdapterRegistry {
     /// Registered adapters by file extension
     private var adaptersByExtension: [String: DiskImageAdapter.Type] = [:]
     
+    /// Flag to track if default adapters have been registered
+    private var defaultAdaptersRegistered = false
+    
     private init() {
-        // Register default adapters
-        register(DMGImageAdapter.self)
-        register(ISO9660ImageAdapter.self)
-        register(VHDImageAdapter.self)
-        register(IMGImageAdapter.self)
-        register(RawDiskImageAdapter.self)
+        // Default adapters will be registered lazily on first access
+        // This avoids initialization issues
+    }
+    
+    /// Ensure default adapters are registered
+    /// Called automatically on first access
+    private func ensureDefaultAdapters() {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        // Only register if not already registered
+        guard !defaultAdaptersRegistered else { return }
+        
+        adapters[DiskImageFormat.dmg] = DMGImageAdapter.self
+        adapters[DiskImageFormat.iso9660] = ISO9660ImageAdapter.self
+        adapters[DiskImageFormat.vhd] = VHDImageAdapter.self
+        adapters[DiskImageFormat.img] = IMGImageAdapter.self
+        adapters[DiskImageFormat.raw] = RawDiskImageAdapter.self
+        
+        // Register by extension
+        let defaultAdapters: [DiskImageAdapter.Type] = [DMGImageAdapter.self, ISO9660ImageAdapter.self, VHDImageAdapter.self, IMGImageAdapter.self, RawDiskImageAdapter.self]
+        for adapter in defaultAdapters {
+            for ext in adapter.supportedExtensions {
+                adaptersByExtension[ext.lowercased()] = adapter
+            }
+        }
+        
+        defaultAdaptersRegistered = true
     }
     
     /// Register a disk image adapter
     /// - Parameter adapter: The adapter type to register
+    /// Thread-safe: Can be called concurrently
     public func register(_ adapter: DiskImageAdapter.Type) {
+        lock.lock()
+        defer { lock.unlock() }
+        
         adapters[adapter.format] = adapter
         
         // Register by extension
@@ -111,7 +143,13 @@ public final class DiskImageAdapterRegistry {
     /// Find an adapter for data with format detection
     /// - Parameter data: First few bytes of the disk image data (for format detection)
     /// - Returns: The adapter type that can handle this data, or `nil` if none found
+    /// Thread-safe: Can be called concurrently
     public func findAdapter(for data: Data) -> DiskImageAdapter.Type? {
+        ensureDefaultAdapters()
+        
+        lock.lock()
+        defer { lock.unlock() }
+        
         // Try all adapters to see which can read this data
         for (_, adapter) in adapters {
             if adapter.canRead(data: data) {
@@ -126,6 +164,10 @@ public final class DiskImageAdapterRegistry {
     /// - Parameter extension: File extension (without dot)
     /// - Returns: The adapter type that typically handles this extension, or `nil` if none found
     public func findAdapter(forExtension ext: String) -> DiskImageAdapter.Type? {
+        ensureDefaultAdapters()
+        
+        lock.lock()
+        defer { lock.unlock() }
         return adaptersByExtension[ext.lowercased()]
     }
     

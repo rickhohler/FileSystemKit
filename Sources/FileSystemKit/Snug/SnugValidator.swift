@@ -13,67 +13,43 @@ public class SnugValidator {
         self.chunkStorage = try SnugStorage.createChunkStorage(at: storageURL)
     }
     
-    public func validateArchive(_ archive: SnugArchive, verbose: Bool) throws -> SnugValidationResult {
+    /// Validate that all files in archive exist in storage
+    /// - Parameters:
+    ///   - archive: Archive to validate
+    ///   - verbose: Whether to print progress
+    /// - Returns: Validation result
+    /// - Throws: Error if validation fails
+    /// Thread-safe: Properly async implementation
+    public func validateArchive(_ archive: SnugArchive, verbose: Bool) async throws -> SnugValidationResult {
         let fileEntries = archive.entries.filter { $0.type == "file" && $0.hash != nil }
         
-        let semaphore = DispatchSemaphore(value: 0)
-        let resultHolder = ValidationResultHolder()
-        let storage = chunkStorage
+        var foundCount = 0
+        var missingHashes: [String] = []
         
-        Task {
-            var foundCount = 0
-            var missingHashes: [String] = []
+        for entry in fileEntries {
+            guard let hash = entry.hash else { continue }
+            let identifier = ChunkIdentifier(id: hash)
             
-            for entry in fileEntries {
-                guard let hash = entry.hash else { continue }
-                let identifier = ChunkIdentifier(id: hash)
-                
-                do {
-                    let exists = try await storage.chunkExists(identifier)
-                    if exists {
-                        foundCount += 1
-                        if verbose {
-                            print("  ✓ \(entry.path) (\(hash.prefix(8))...)")
-                        }
-                    } else {
-                        missingHashes.append(hash)
-                        if verbose {
-                            print("  ✗ \(entry.path) (\(hash.prefix(8))...) - MISSING")
-                        }
-                    }
-                } catch {
-                    resultHolder.error = error
-                    semaphore.signal()
-                    return
+            let exists = try await chunkStorage.chunkExists(identifier)
+            if exists {
+                foundCount += 1
+                if verbose {
+                    print("  ✓ \(entry.path) (\(hash.prefix(8))...)")
+                }
+            } else {
+                missingHashes.append(hash)
+                if verbose {
+                    print("  ✗ \(entry.path) (\(hash.prefix(8))...) - MISSING")
                 }
             }
-            
-            resultHolder.foundCount = foundCount
-            resultHolder.missingHashes = missingHashes
-            semaphore.signal()
-        }
-        
-        semaphore.wait()
-        
-        if let error = resultHolder.error {
-            throw error
         }
         
         return SnugValidationResult(
-            allFilesExist: resultHolder.missingHashes.isEmpty,
+            allFilesExist: missingHashes.isEmpty,
             totalFiles: fileEntries.count,
-            filesFound: resultHolder.foundCount,
-            filesMissing: resultHolder.missingHashes.count,
-            missingHashes: resultHolder.missingHashes
+            filesFound: foundCount,
+            filesMissing: missingHashes.count,
+            missingHashes: missingHashes
         )
     }
 }
-
-// Helper class for thread-safe storage
-private final class ValidationResultHolder: @unchecked Sendable {
-    var foundCount: Int = 0
-    var missingHashes: [String] = []
-    var error: Error?
-}
-
-

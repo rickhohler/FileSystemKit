@@ -90,17 +90,27 @@ public struct FileSystemChunkStorage: ChunkStorage, Sendable {
 }
 
 /// File system-based ChunkHandle implementation
-private final class FileSystemChunkHandle: ChunkHandle, @unchecked Sendable {
+/// Thread-safe: Uses actor isolation to protect FileHandle access
+private actor FileSystemChunkHandleActor {
     private let url: URL
     private var fileHandle: FileHandle?
     private var isClosed = false
+    private let cachedSize: Int
     
     init(url: URL) throws {
         self.url = url
         self.fileHandle = try FileHandle(forReadingFrom: url)
+        
+        // Cache size at initialization (file size doesn't change for read-only handles)
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let fileSize = attributes[.size] as? Int64 {
+            self.cachedSize = Int(fileSize)
+        } else {
+            self.cachedSize = 0
+        }
     }
     
-    func read(range: Range<Int>) async throws -> Data {
+    func read(range: Range<Int>) throws -> Data {
         guard !isClosed, let handle = fileHandle else {
             throw FileSystemError.storageUnavailable(reason: "File handle is closed or unavailable")
         }
@@ -113,17 +123,46 @@ private final class FileSystemChunkHandle: ChunkHandle, @unchecked Sendable {
     }
     
     var size: Int {
-        guard let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
-              let fileSize = attributes[.size] as? Int64 else {
-            return 0
-        }
-        return Int(fileSize)
+        return cachedSize
     }
     
-    func close() async throws {
+    func close() throws {
         try fileHandle?.close()
         fileHandle = nil
         isClosed = true
+    }
+}
+
+/// Thread-safe wrapper for FileSystemChunkHandleActor
+private final class FileSystemChunkHandle: ChunkHandle, @unchecked Sendable {
+    private let actor: FileSystemChunkHandleActor
+    private let cachedSize: Int
+    
+    init(url: URL) throws {
+        // Compute size directly (file attributes are thread-safe to read)
+        let size: Int
+        if let attributes = try? FileManager.default.attributesOfItem(atPath: url.path),
+           let fileSize = attributes[.size] as? Int64 {
+            size = Int(fileSize)
+        } else {
+            size = 0
+        }
+        self.cachedSize = size
+        
+        // Initialize actor (it will also cache size internally)
+        self.actor = try FileSystemChunkHandleActor(url: url)
+    }
+    
+    func read(range: Range<Int>) async throws -> Data {
+        return try await actor.read(range: range)
+    }
+    
+    var size: Int {
+        return cachedSize
+    }
+    
+    func close() async throws {
+        try await actor.close()
     }
 }
 

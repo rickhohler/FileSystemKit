@@ -346,85 +346,9 @@ public class FileSystemEntry: FileSystemComponent {
     // MARK: - Private Helpers
     
     private func computeHash(data: Data, algorithm: HashAlgorithm) throws -> FileHash {
-        #if canImport(CryptoKit)
-        let digest: any Digest
-        switch algorithm {
-        case .sha256:
-            digest = SHA256.hash(data: data)
-        case .sha1:
-            digest = Insecure.SHA1.hash(data: data)
-        case .md5:
-            digest = Insecure.MD5.hash(data: data)
-        case .crc32:
-            // CRC32 not in CryptoKit, use simple implementation
-            return FileHash(algorithm: .crc32, value: computeCRC32(data: data))
-        }
-        
-        return FileHash(algorithm: algorithm, value: Data(digest))
-        #elseif canImport(CommonCrypto)
-        // Fallback: Use CommonCrypto (available on Apple platforms)
-        switch algorithm {
-        case .sha256:
-            var digest = [UInt8](repeating: 0, count: Int(CC_SHA256_DIGEST_LENGTH))
-            data.withUnsafeBytes { bytes in
-                _ = CC_SHA256(bytes.baseAddress, CC_LONG(data.count), &digest)
-            }
-            return FileHash(algorithm: .sha256, value: Data(digest))
-        case .sha1:
-            var digest = [UInt8](repeating: 0, count: Int(CC_SHA1_DIGEST_LENGTH))
-            data.withUnsafeBytes { bytes in
-                _ = CC_SHA1(bytes.baseAddress, CC_LONG(data.count), &digest)
-            }
-            return FileHash(algorithm: .sha1, value: Data(digest))
-        case .md5:
-            #if canImport(CryptoKit)
-            // Use CryptoKit's Insecure.MD5 - explicitly marked as insecure for legacy compatibility
-            let digest = Insecure.MD5.hash(data: data)
-            return FileHash(algorithm: .md5, value: Data(digest))
-            #elseif canImport(CommonCrypto)
-            // Fallback: Use CommonCrypto (deprecated but kept for legacy compatibility)
-            // MD5 is intentionally kept for legacy compatibility (companion files, existing checksums)
-            // Note: CC_MD5 deprecation warning is intentional - MD5 is read-only legacy support
-            var digest = [UInt8](repeating: 0, count: Int(CC_MD5_DIGEST_LENGTH))
-            data.withUnsafeBytes { bytes in
-                digest.withUnsafeMutableBytes { digestBytes in
-                    // Using deprecated CC_MD5 intentionally for legacy compatibility
-                    _ = CC_MD5(bytes.baseAddress, CC_LONG(data.count), digestBytes.baseAddress)
-                }
-            }
-            return FileHash(algorithm: .md5, value: Data(digest))
-            #else
-            throw FileSystemError.hashNotImplemented(algorithm: .md5)
-            #endif
-        case .crc32:
-            return FileHash(algorithm: .crc32, value: computeCRC32(data: data))
-        }
-        #else
-        throw FileSystemError.hashNotImplemented(algorithm: nil)
-        #endif
-    }
-    
-    private func computeCRC32(data: Data) -> Data {
-        // Simple CRC32 implementation
-        var crc: UInt32 = 0xFFFFFFFF
-        let polynomial: UInt32 = 0xEDB88320
-        
-        var table: [UInt32] = Array(repeating: 0, count: 256)
-        for i in 0..<256 {
-            var value = UInt32(i)
-            for _ in 0..<8 {
-                value = (value & 1) != 0 ? (value >> 1) ^ polynomial : value >> 1
-            }
-            table[i] = value
-        }
-        
-        for byte in data {
-            let index = Int((crc ^ UInt32(byte)) & 0xFF)
-            crc = (crc >> 8) ^ table[index]
-        }
-        
-        crc ^= 0xFFFFFFFF
-        return withUnsafeBytes(of: crc.bigEndian) { Data($0) }
+        // Use FileSystemKit's core HashComputation for unified implementation
+        let hashData = try HashComputation.computeHash(data: data, algorithm: algorithm)
+        return FileHash(algorithm: algorithm, value: hashData)
     }
 }
 

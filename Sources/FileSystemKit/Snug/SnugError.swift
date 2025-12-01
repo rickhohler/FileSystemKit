@@ -81,7 +81,7 @@ public enum SnugError: Error, CustomStringConvertible, LocalizedError {
             return "Use a supported hash algorithm: sha256 (recommended), sha1, or md5."
         case .compressionFailed:
             return "Check available disk space and verify the source file is not corrupted. Try decompressing manually to verify the file."
-        case .brokenSymlink(let path, let target):
+        case .brokenSymlink(_, let target):
             return "The symlink target '\(target)' does not exist. Verify the target path or recreate the symlink."
         case .symlinkCycle(let path):
             return "A circular symlink reference was detected at '\(path)'. Remove the circular reference."
@@ -89,8 +89,8 @@ public enum SnugError: Error, CustomStringConvertible, LocalizedError {
             return "Run with appropriate permissions or change file permissions for '\(path)'."
         case .embeddedFileNotFound(let hash):
             return "The embedded file with hash '\(hash)' is missing from the archive. The archive may be incomplete or corrupted."
-        default:
-            return nil
+        case .notADirectory(let path):
+            return "The path '\(path)' is not a directory. Verify the path points to a directory."
         }
     }
 }

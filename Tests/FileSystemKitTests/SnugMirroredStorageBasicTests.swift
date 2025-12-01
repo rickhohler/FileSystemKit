@@ -1,48 +1,11 @@
 // FileSystemKit Tests
-// Unit tests for SNUG Mirrored Storage: glacier mirroring, multi-storage operations
+// SnugMirroredStorage Basic Operations Unit Tests
 
 import XCTest
 @testable import FileSystemKit
 import Foundation
 
-final class SnugMirroredStorageTests: XCTestCase {
-    var tempPrimaryDir: URL!
-    var tempMirrorDir: URL!
-    var tempGlacierDir: URL!
-    var primaryStorage: SnugFileSystemChunkStorage!
-    var mirrorStorage: SnugFileSystemChunkStorage!
-    var glacierStorage: SnugFileSystemChunkStorage!
-    
-    override func setUp() {
-        super.setUp()
-        tempPrimaryDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("snug-primary-\(UUID().uuidString)")
-        tempMirrorDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("snug-mirror-\(UUID().uuidString)")
-        tempGlacierDir = FileManager.default.temporaryDirectory
-            .appendingPathComponent("snug-glacier-\(UUID().uuidString)")
-        
-        try? FileManager.default.createDirectory(at: tempPrimaryDir, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(at: tempMirrorDir, withIntermediateDirectories: true)
-        try? FileManager.default.createDirectory(at: tempGlacierDir, withIntermediateDirectories: true)
-        
-        primaryStorage = SnugFileSystemChunkStorage(baseURL: tempPrimaryDir)
-        mirrorStorage = SnugFileSystemChunkStorage(baseURL: tempMirrorDir)
-        glacierStorage = SnugFileSystemChunkStorage(baseURL: tempGlacierDir)
-    }
-    
-    override func tearDown() {
-        try? FileManager.default.removeItem(at: tempPrimaryDir)
-        try? FileManager.default.removeItem(at: tempMirrorDir)
-        try? FileManager.default.removeItem(at: tempGlacierDir)
-        tempPrimaryDir = nil
-        tempMirrorDir = nil
-        tempGlacierDir = nil
-        primaryStorage = nil
-        mirrorStorage = nil
-        glacierStorage = nil
-        super.tearDown()
-    }
+final class SnugMirroredStorageBasicTests: SnugMirroredStorageTestBase {
     
     // MARK: - Glacier Mirroring Tests
     
@@ -118,37 +81,6 @@ final class SnugMirroredStorageTests: XCTestCase {
         XCTAssertNotNil(glacier2Data)
         XCTAssertEqual(glacier1Data, testData)
         XCTAssertEqual(glacier2Data, testData)
-    }
-    
-    func testGlacierMirroringDoesNotFailOperation() async throws {
-        // Create a glacier storage that will fail
-        let failingGlacierDir = tempGlacierDir.appendingPathComponent("failing")
-        // Don't create directory, so writes will fail
-        
-        let failingGlacierStorage = SnugFileSystemChunkStorage(baseURL: failingGlacierDir)
-        
-        let mirroredStorage = SnugMirroredChunkStorage(
-            primaryStorage: primaryStorage,
-            mirrorStorages: [],
-            glacierStorages: [failingGlacierStorage],
-            failOnPrimaryError: true
-        )
-        
-        let testData = Data("Test data".utf8)
-        let identifier = ChunkIdentifier(id: "testhash")
-        let metadata = ChunkMetadata(
-            size: testData.count,
-            contentHash: "testhash",
-            hashAlgorithm: "sha256"
-        )
-        
-        // Should succeed even if glacier write fails
-        _ = try await mirroredStorage.writeChunk(testData, identifier: identifier, metadata: metadata)
-        
-        // Primary should still have the data
-        let primaryData = try await primaryStorage.readChunk(identifier)
-        XCTAssertNotNil(primaryData)
-        XCTAssertEqual(primaryData, testData)
     }
     
     // MARK: - Read Operations Tests
@@ -289,44 +221,6 @@ final class SnugMirroredStorageTests: XCTestCase {
         
         let exists = try await mirroredStorage.chunkExists(identifier)
         XCTAssertFalse(exists)
-    }
-    
-    // MARK: - Concurrent Operations Tests
-    
-    func testConcurrentWritesToMultipleStorages() async throws {
-        let mirroredStorage = SnugMirroredChunkStorage(
-            primaryStorage: primaryStorage,
-            mirrorStorages: [mirrorStorage],
-            glacierStorages: [glacierStorage],
-            failOnPrimaryError: true
-        )
-        
-        // Write multiple chunks concurrently
-        await withTaskGroup(of: Void.self) { group in
-            for i in 0..<10 {
-                group.addTask {
-                    let testData = Data("Concurrent test \(i)".utf8)
-                    let identifier = ChunkIdentifier(id: "concurrent\(i)")
-                    let metadata = ChunkMetadata(
-                        size: testData.count,
-                        contentHash: "concurrent\(i)",
-                        hashAlgorithm: "sha256"
-                    )
-                    _ = try? await mirroredStorage.writeChunk(testData, identifier: identifier, metadata: metadata)
-                }
-            }
-        }
-        
-        // Verify all chunks exist in all storages
-        for i in 0..<10 {
-            let identifier = ChunkIdentifier(id: "concurrent\(i)")
-            let primaryExists = try await primaryStorage.chunkExists(identifier)
-            let mirrorExists = try await mirrorStorage.chunkExists(identifier)
-            let glacierExists = try await glacierStorage.chunkExists(identifier)
-            XCTAssertTrue(primaryExists)
-            XCTAssertTrue(mirrorExists)
-            XCTAssertTrue(glacierExists)
-        }
     }
 }
 

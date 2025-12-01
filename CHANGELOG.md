@@ -7,6 +7,99 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.0] - 2025-12-01
+
+### Added
+- **DirectoryParser Refactoring**: Broke out `DirectoryParser.swift` (658 lines) into 8 focused files
+  - `DirectoryEntry.swift` - Entry struct and conversion methods
+  - `DirectoryParserOptions.swift` - Configuration options
+  - `DirectoryParserDelegate.swift` - Delegate protocol
+  - `IgnoreMatcher.swift` - Ignore pattern matcher protocol
+  - `DirectoryParserError.swift` - Error types
+  - `DirectoryParser.swift` - Main parser implementation
+  - `Helpers/EntryProcessor.swift` - Entry processing logic
+  - `FileSystemBuilderDelegate.swift` - FileSystem builder delegate
+- **DirectoryParser Test Refactoring**: Refactored `DirectoryParserTests.swift` (205 lines) into 6 focused test files
+  - `DirectoryEntryTests.swift` - DirectoryEntry tests
+  - `DirectoryParserOptionsTests.swift` - Options tests
+  - `DirectoryParserBasicTests.swift` - Basic parsing tests
+  - `DirectoryParserEdgeCaseTests.swift` - Edge cases (ignore patterns, hidden files, base path)
+  - `DirectoryParserErrorTests.swift` - Error tests
+  - `Helpers/DirectoryParserTestBase.swift` - Shared test base and helpers
+- **Compression Adapter Test Refactoring**: Refactored `CompressionAdapterTests.swift` (370 lines) into 7 focused test files
+- **SnugArchiver Test Refactoring**: Refactored `SnugArchiverTests.swift` (517 lines) into 5 focused test files
+- **FileHashCache Test Refactoring**: Refactored `FileHashCacheTests.swift` (451 lines) into 6 focused test files
+- **FileSystemComponent Test Refactoring**: Refactored `FileSystemComponentTests.swift` (306 lines) into 3 focused test files
+- **RawDiskData Test Refactoring**: Refactored `RawDiskDataTests.swift` (349 lines) into 3 focused test files
+- **SnugConfig Test Refactoring**: Refactored `SnugConfigTests.swift` (405 lines) into 4 focused test files
+- **SnugMirroredStorage Test Refactoring**: Refactored `SnugMirroredStorageTests.swift` (332 lines) into 3 focused test files
+- **DiskImageAdapter Test Refactoring**: Refactored `DiskImageAdapterTests.swift` (552 lines) into 7 focused test files
+
+### Changed
+- **Hash Computation Consolidation**: Unified hash computation implementations (Issue #130)
+  - Created `FileSystemKit/Core/HashComputation.swift` as unified implementation
+  - Migrated all call sites to use unified implementation
+  - Removed ~200-300 lines of duplicate code
+- **Compression Adapter Refactoring**: Broke out `CompressionAdapter.swift` (2,389 lines) into 15 focused files
+  - Core types moved to `Core/` subdirectory
+  - Individual adapters moved to `Adapters/` subdirectory
+  - Shared LZW helpers moved to `Adapters/Helpers/`
+- **SnugArchiver Refactoring**: Broke out `SnugArchiver.swift` (903 lines) into 5 focused files
+  - `SnugArchiver.swift` - Main class with initialization and createArchive
+  - `Processing/DirectoryProcessor.swift` - Directory traversal and file processing
+  - `Utilities/ProgressReporter.swift` - Progress reporting
+  - `Utilities/SnugHashComputation.swift` - Hash computation wrapper
+  - `Utilities/CompressionHelpers.swift` - Compression utilities
+
+### Fixed
+- Fixed build issues with duplicate file names (`HashComputation.swift` → `SnugHashComputation.swift`)
+- Fixed async context issues in `DirectoryProcessor` and `ArchiveFacade`
+- Fixed test files to use `await` for async `createArchive` calls
+- Fixed `ArchiveFacade` duplicate code and missing imports
+- Fixed enumerator iteration in async contexts
+
+## [1.3.2] - 2025-12-01
+
+### Added
+- **DirectoryParser Refactoring**: Broke out `DirectoryParser.swift` (658 lines) into 8 focused files
+  - `DirectoryEntry.swift` - Entry struct and conversion methods
+  - `DirectoryParserOptions.swift` - Configuration options
+  - `DirectoryParserDelegate.swift` - Delegate protocol
+  - `IgnoreMatcher.swift` - Ignore pattern matcher protocol
+  - `DirectoryParserError.swift` - Error types
+  - `DirectoryParser.swift` - Main parser implementation
+  - `Helpers/EntryProcessor.swift` - Entry processing logic
+  - `FileSystemBuilderDelegate.swift` - FileSystem builder delegate
+- **DirectoryParser Test Refactoring**: Refactored `DirectoryParserTests.swift` (205 lines) into 6 focused test files
+  - `DirectoryEntryTests.swift` - DirectoryEntry tests
+  - `DirectoryParserOptionsTests.swift` - Options tests
+  - `DirectoryParserBasicTests.swift` - Basic parsing tests
+  - `DirectoryParserEdgeCaseTests.swift` - Edge cases (ignore patterns, hidden files, base path)
+  - `DirectoryParserErrorTests.swift` - Error tests
+  - `Helpers/DirectoryParserTestBase.swift` - Shared test base and helpers
+
+### Changed
+- **Hash Computation Consolidation**: Unified hash computation implementations (Issue #130)
+  - Created `FileSystemKit/Core/HashComputation.swift` as unified implementation
+  - Migrated all call sites to use unified implementation
+  - Removed ~200-300 lines of duplicate code
+- **Compression Adapter Refactoring**: Broke out `CompressionAdapter.swift` (2,389 lines) into 15 focused files
+  - Core types moved to `Core/` subdirectory
+  - Individual adapters moved to `Adapters/` subdirectory
+  - Shared LZW helpers moved to `Adapters/Helpers/`
+- **SnugArchiver Refactoring**: Broke out `SnugArchiver.swift` (903 lines) into 5 focused files
+  - `SnugArchiver.swift` - Main class with initialization and createArchive
+  - `Processing/DirectoryProcessor.swift` - Directory traversal and file processing
+  - `Utilities/ProgressReporter.swift` - Progress reporting
+  - `Utilities/SnugHashComputation.swift` - Hash computation wrapper
+  - `Utilities/CompressionHelpers.swift` - Compression utilities
+
+### Fixed
+- Fixed build issues with duplicate file names (`HashComputation.swift` → `SnugHashComputation.swift`)
+- Fixed async context issues in `DirectoryProcessor` and `ArchiveFacade`
+- Fixed test files to use `await` for async `createArchive` calls
+- Fixed `ArchiveFacade` duplicate code and missing imports
+
 ## [1.3.2] - 2025-12-01
 
 ### Added
