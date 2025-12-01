@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.2] - 2025-12-01
+
+### Fixed
+- Removed invalid `.documentation` product declaration from Package.swift (DocC is built into Swift and doesn't require a product declaration)
+
 ## [1.5.1] - 2025-12-01
 
 ### Added
