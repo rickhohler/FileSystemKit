@@ -55,8 +55,8 @@ final class FileTypeDetectorTests: XCTestCase {
     func testDetectISO9660File() throws {
         // Create a test ISO file with ISO 9660 signature
         let testFile = tempDirectory.appendingPathComponent("test.iso")
-        var isoData = Data(count: 32773) // Minimum size for ISO detection
-        // Add "CD001" signature at offset 32769
+        var isoData = Data(count: 32774) // Minimum size for ISO detection (32769 + 5 for "CD001")
+        // Add "CD001" signature at offset 32769 (ISO 9660 volume descriptor signature)
         let cd001Signature = "CD001".data(using: .isoLatin1)!
         isoData.replaceSubrange(32769..<32774, with: cd001Signature)
         try isoData.write(to: testFile)

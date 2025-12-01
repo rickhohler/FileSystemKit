@@ -46,12 +46,14 @@ public struct FileTypeDetector {
                     return FileTypeInfo(type: "disk-image", contentType: "application/x-apple-diskimage")
                 }
             }
+            // Fall back to extension-based detection if file is too small for signature
+            return FileTypeInfo(type: "disk-image", contentType: "application/x-apple-diskimage")
         }
         
         // ISO 9660 (CD-ROM/DVD-ROM)
         if fileExtension == "iso" || fileExtension == "img" {
             // Check for ISO 9660 volume descriptor at sector 16 (32768 bytes)
-            if data.count >= 32769 {
+            if data.count > 32768 {
                 let vdsStart = 32768
                 if data[vdsStart] == 0x01 {
                     // Primary Volume Descriptor
@@ -59,11 +61,15 @@ public struct FileTypeDetector {
                 }
             }
             // Check for ISO 9660 signature "CD001" at offset 32769
-            if data.count >= 32773 {
-                let signature = String(data: data.subdata(in: 32769..<32773), encoding: .isoLatin1) ?? ""
+            if data.count >= 32774 {
+                let signature = String(data: data.subdata(in: 32769..<32774), encoding: .isoLatin1) ?? ""
                 if signature == "CD001" {
                     return FileTypeInfo(type: "disk-image", contentType: "application/x-iso9660-image")
                 }
+            }
+            // Fall back to extension-based detection if file is too small for signature
+            if fileExtension == "iso" {
+                return FileTypeInfo(type: "disk-image", contentType: "application/x-iso9660-image")
             }
         }
         
@@ -78,6 +84,8 @@ public struct FileTypeDetector {
                     }
                 }
             }
+            // Fall back to extension-based detection if file is too small for signature
+            return FileTypeInfo(type: "disk-image", contentType: "application/x-vhd")
         }
         
         // Raw disk image (IMG) - check if size suggests a disk image
@@ -87,6 +95,8 @@ public struct FileTypeDetector {
                 // Could be a raw disk image
                 return FileTypeInfo(type: "disk-image", contentType: "application/octet-stream")
             }
+            // Fall back to extension-based detection
+            return FileTypeInfo(type: "disk-image", contentType: "application/octet-stream")
         }
         
         // Default to regular file
