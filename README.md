@@ -66,7 +66,7 @@ Add FileSystemKit to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/rickhohler/FileSystemKit.git", from: "1.3.1")
+    .package(url: "https://github.com/rickhohler/FileSystemKit.git", from: "1.5.0")
 ]
 ```
 
@@ -264,6 +264,7 @@ if let format = FileSystemStrategyFactory.detectFormat(in: diskData) {
 
 ## Documentation
 
+- **[Apple DocC Documentation](https://rickhohler.github.io/documentation/FileSystemKit/documentation/filesystemkit/)** - Complete API reference with interactive documentation for the latest release
 - [API Documentation](https://github.com/rickhohler/FileSystemKit/wiki) - Detailed API reference (coming soon)
 - [Architecture Guide](https://github.com/rickhohler/FileSystemKit/wiki/Architecture) - Understanding FileSystemKit's architecture
 - [Contributing Guide](CONTRIBUTING.md) - How to contribute to FileSystemKit
