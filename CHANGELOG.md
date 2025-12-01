@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.3.1] - 2025-12-01
+
+### Fixed
+- Fixed `FileTypeDetector` bounds checking for ISO9660 detection (32768 vs 32769)
+- Added extension-based fallback for small files that can't be detected by magic numbers
+- Fixed `SnugError` warnings: removed unused `path` parameter in `brokenSymlink` recovery suggestion
+- Fixed `SnugError` exhaustive switch statement by adding missing `notADirectory` case
+
 ## [1.3.0] - 2025-11-30
 
 ### Changed
