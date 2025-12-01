@@ -304,8 +304,8 @@ extension FileHashCache {
     /// - Returns: Computed hash string
     /// - Throws: SnugError if algorithm is unsupported
     public func computeHash(for url: URL, data: Data, hashAlgorithm: String) async throws -> String {
-        // Check cache first (actor isolation requires await)
-        if let cachedHash = await getHash(for: url) {
+        // Check cache first (no await needed - same actor isolation domain)
+        if let cachedHash = getHash(for: url) {
             return cachedHash
         }
         
@@ -317,8 +317,8 @@ extension FileHashCache {
         let fileSize = Int64(data.count)
         let modificationTime = attributes?[.modificationDate] as? Date ?? Date()
         
-        // Store in cache (actor isolation requires await)
-        await setHash(hash, for: url, fileSize: fileSize, modificationTime: modificationTime)
+        // Store in cache (no await needed - same actor isolation domain)
+        setHash(hash, for: url, fileSize: fileSize, modificationTime: modificationTime)
         
         return hash
     }
