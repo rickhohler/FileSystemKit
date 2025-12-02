@@ -7,6 +7,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2025-12-02
+
+### Added
+- **Composable Chunk Storage Architecture**: New composable protocols that extend the existing `ChunkStorage` protocol
+  - `ChunkStorageOrganization` protocol for storage path organization strategies
+  - `ChunkStorageRetrieval` protocol for read/write operations
+  - `ChunkStorageExistence` protocol for efficient existence checks
+  - `ChunkStorageComposable` protocol that composes the above protocols
+  - `ChunkStorage+Default` extension providing convenience methods
+- **Storage Organization Strategies**: Implementations for organizing chunk storage
+  - `GitStyleOrganization` - Git-style hash-based directory structure (default, depth 1-4)
+  - `FlatOrganization` - Flat directory structure with all chunks in single directory
+- **File System Implementations**: Concrete implementations for local file system
+  - `FileSystemRetrieval` - Local file system read/write operations with metadata support
+  - `FileSystemExistence` - Optimized existence checks for file system
+  - `ComposableFileSystemChunkStorage` - Complete file system-based chunk storage solution
+- **Comprehensive Test Suite**: Unit tests for all new protocols and implementations
+  - `GitStyleOrganizationTests` - Tests for Git-style organization strategy
+  - `FlatOrganizationTests` - Tests for flat organization strategy
+  - `ChunkStorageRetrievalTests` - Tests for retrieval operations
+  - `ChunkStorageExistenceTests` - Tests for existence checks
+  - `ComposableFileSystemChunkStorageBasicTests` - Basic initialization and organization tests
+  - `ComposableFileSystemChunkStorageOperationsTests` - Read/write/update/delete operations tests
+
+### Changed
+- **Enhanced Architecture**: Added composable protocols alongside existing `ChunkStorage` protocol
+  - New `ChunkStorageComposable` protocol extends `ChunkStorage` for composable architecture
+  - New `ChunkStorageOrganization` protocol for configurable storage organization strategies
+  - New `ChunkStorageRetrieval` protocol for composable read/write operations
+  - New `ChunkStorageExistence` protocol for optimized existence checks
+  - Existing `ChunkStorage` protocol and implementations remain unchanged and fully backward compatible
+
+### Notes
+- **Backward Compatibility**: All existing `ChunkStorage` implementations continue to work unchanged
+- **Optional Migration**: Clients can optionally adopt the new composable architecture for enhanced flexibility
+- **New Implementation**: `ComposableFileSystemChunkStorage` provides a new implementation option alongside existing `FileSystemChunkStorage`
+
 ## [1.5.2] - 2025-12-01
 
 ### Fixed
