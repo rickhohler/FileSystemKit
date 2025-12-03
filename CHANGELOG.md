@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.7.0] - 2025-12-03
 
 ### Added
+- **Chunk Storage Error Handling & Validation (Phase 3)**: Comprehensive error handling and validation system
+  - `ChunkStorageErrors` enum with 20+ specific error types for chunk storage operations
+  - `ChunkValidator` actor for validating chunk data integrity, metadata, and storage operations
+  - Comprehensive error descriptions and recovery suggestions
+  - Support for underlying error wrapping and error context
+  - Complete test coverage with `ChunkStorageErrorsTests` (25 tests) and `ChunkValidatorTests` (396 tests)
 - **File Type Metadata**: Enhanced file type detection and metadata support
   - `FileTypeMetadata` for structured file type information
   - `FileTypeMetadataExamples` with comprehensive examples
@@ -43,8 +49,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - VENDOR_USAGE_EXAMPLES.md: Usage examples
 
 ### Changed
+- Enhanced `ChunkStorageProvider` with improved error handling and validation support
 - Enhanced `SnugConfig` and `SnugStorage` with improved configuration options
-- Improved `ChunkStorageProvider` integration
+- Improved chunk storage provider integration with validation capabilities
 
 ## [1.6.0] - 2025-12-02
 
