@@ -30,8 +30,20 @@ import Foundation
 /// let extensions = await registry.extensions(forType: "disk-image")
 /// ```
 public actor FileExtensionRegistry {
-    /// Shared singleton instance
-    public static let shared = FileExtensionRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    nonisolated(unsafe) private static var _shared: FileExtensionRegistry?
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy)
+    public static var shared: FileExtensionRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared == nil {
+            _shared = FileExtensionRegistry()
+        }
+        return _shared!
+    }
     
     /// Extension to type mapping (extension -> type)
     private var extensionToType: [String: String] = [:]

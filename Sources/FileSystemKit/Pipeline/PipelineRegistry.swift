@@ -16,8 +16,20 @@ import Foundation
 
 /// Central registry for managing and discovering pipelines
 public actor PipelineRegistry {
-    /// Shared singleton instance
-    public static let shared = PipelineRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    nonisolated(unsafe) private static var _shared: PipelineRegistry?
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy)
+    public static var shared: PipelineRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared == nil {
+            _shared = PipelineRegistry()
+        }
+        return _shared!
+    }
     
     /// Registered pipelines by ID
     private var pipelines: [String: any Pipeline] = [:]

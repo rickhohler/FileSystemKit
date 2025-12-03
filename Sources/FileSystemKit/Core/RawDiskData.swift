@@ -319,6 +319,7 @@ public struct DiskImageHash: Hashable, Codable, Sendable {
 /// - `geometry` - Disk geometry information
 /// - `copyProtection` - Copy protection details
 /// - `tags` - Categorization tags
+/// - `bootability` - Bootability state and boot instructions
 ///
 /// ## See Also
 ///
@@ -380,6 +381,24 @@ public struct DiskImageMetadata: Codable, Sendable {
     /// nil if vendor cannot be identified
     public var vendorName: String?
     
+    /// Detected disk image format (Layer 2: how disk is stored in file)
+    /// Examples: .dsk, .woz, .d64, .atr, .dmg, .iso9660
+    /// This is the container format, not the file system format
+    /// Set by DiskImageAdapter when extracting raw disk data
+    public var detectedDiskImageFormat: DiskImageFormat?
+    
+    /// Detected file system format (Layer 3: operating system's file system structure)
+    /// Examples: .appleDOS33, .proDOS, .sos, .ucsdPascal, .c64_1541
+    /// This is the file system format within the disk image
+    /// Set by FileSystemStrategy when detecting format from raw disk data
+    public var detectedFileSystemFormat: FileSystemFormat?
+    
+    /// Bootability information for this disk image
+    /// Contains bootability state and boot instructions
+    /// Set automatically during disk image analysis based on detection of boot code patterns
+    /// and file system format analysis
+    public var bootability: BootInstructions?
+    
     public init(
         title: String? = nil,
         publisher: String? = nil,
@@ -396,7 +415,10 @@ public struct DiskImageMetadata: Codable, Sendable {
         copyProtection: CopyProtectionInfo? = nil,
         tags: [String] = [],
         vendorID: UUID? = nil,
-        vendorName: String? = nil
+        vendorName: String? = nil,
+        detectedDiskImageFormat: DiskImageFormat? = nil,
+        detectedFileSystemFormat: FileSystemFormat? = nil,
+        bootability: BootInstructions? = nil
     ) {
         self.title = title
         self.publisher = publisher
@@ -414,6 +436,9 @@ public struct DiskImageMetadata: Codable, Sendable {
         self.tags = tags
         self.vendorID = vendorID
         self.vendorName = vendorName
+        self.detectedDiskImageFormat = detectedDiskImageFormat
+        self.detectedFileSystemFormat = detectedFileSystemFormat
+        self.bootability = bootability
     }
 }
 

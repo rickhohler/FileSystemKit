@@ -18,14 +18,14 @@ public enum DiskImageFormat: String, Codable, CaseIterable, Sendable {
     
     // Vintage formats (pre-2000, obsolete) - For compatibility with extended packages
     // Apple II formats
-    case a2r = "a2r"               // A2R flux-level format
-    case woz = "woz"               // WOZ format with copy protection
+    case a2r = "a2r"               // A2R flux-level format (preserves copy protection)
+    case woz = "woz"               // WOZ format (preserves copy protection and timing)
     case nib = "nib"               // NIB (Nibble) format with raw GCR data
-    case hdv = "hdv"               // HDV (Hard Disk Volume) format for ProDOS
-    case twoMG = "2mg"             // 2MG (Universal) Apple II disk image format
-    case po = "po"                 // ProDOS disk image format
-    case `do` = "do"               // DOS 3.3 disk image format
-    case d13 = "d13"               // DOS 3.3 disk image format (13-sector)
+    case hdv = "hdv"               // HDV (Hard Disk Volume) format for ProDOS hard disk images
+    case twoMG = "2mg"             // 2MG (Universal) Apple II disk image format (supports multiple formats)
+    case po = "po"                 // ProDOS disk image format (hierarchical file system, 1983+)
+    case `do` = "do"               // Apple DOS 3.3 disk image format (16 sectors per track, 1980)
+    case d13 = "d13"               // Apple DOS 3.1/3.2 disk image format (13 sectors per track, 1978-1979)
     
     // Commodore formats
     case d64 = "d64"               // Commodore 64 1541 disk images

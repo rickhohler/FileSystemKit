@@ -22,7 +22,7 @@ import Foundation
 /// ## Vintage Formats (Extended Packages)
 ///
 /// Formats for compatibility with packages like RetroboxFS:
-/// - Apple II: `.apple2DOS33`, `.apple2ProDOS`, `.apple2Pascal`
+/// - Apple II: `.appleDOS33`, `.proDOS`, `.ucsdPascal`
 /// - Commodore 64: `.c64_1541`, `.c64_1581`, `.c64_TAP`, `.c64_T64`
 /// - Atari 8-bit: `.atariDOS20`, `.atariDOS25`
 /// - And many more...
@@ -80,15 +80,16 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
     
     // Vintage file systems (pre-2000, obsolete) - For compatibility with extended packages
     // Apple II
-    case apple2DOS33 = "apple2-dos33"
-    case apple2ProDOS = "apple2-prodos"
-    case apple2Pascal = "apple2-pascal"
-    case apple2Corvus = "apple2-corvus"
-    case apple2Cassette = "apple2-cassette"
+    case appleDOS33 = "apple-dos-3.3"        // Apple DOS 3.3 (industry standard: "DOS 3.3" or "Apple DOS")
+    case proDOS = "prodos"                   // ProDOS (industry standard name, no prefix needed)
+    case ucsdPascal = "ucsd-pascal"          // UCSD Pascal (industry standard name)
+    case appleCorvus = "apple-corvus"        // Corvus hard disk format
+    case appleCassette = "apple-cassette"    // Apple II cassette tape format
+    case appleIICPM = "apple-ii-cpm"        // Apple II CP/M (Control Program/Monitor) - CP/M 2.2 for Apple II
     
     // Apple III
-    case apple3SOS = "apple3-sos"
-    case apple3Pascal = "apple3-pascal"
+    case sos = "sos"                         // SOS - Sophisticated Operating System (industry standard name)
+    case appleIIIPascal = "apple-iii-pascal" // Apple III Pascal
     
     // Apple Lisa
     case lisaLFS = "lisa-lfs"
@@ -144,8 +145,8 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
         case .ntfs: return 10737418240  // 10 GB (typical)
         case .exfat: return 10737418240 // 10 GB (typical)
         // Vintage formats
-        case .apple2DOS33: return 143360  // 35 tracks * 16 sectors * 256 bytes
-        case .apple2ProDOS: return 143360
+        case .appleDOS33: return 143360  // 35 tracks * 16 sectors * 256 bytes
+        case .proDOS: return 143360
         case .c64_1541: return 174848     // 35 tracks * 17 sectors * 256 bytes
         case .c64_1581: return 819200     // 80 tracks * 10 sectors * 1024 bytes
         case .atariDOS20, .atariDOS25: return 92160  // 40 tracks * 18 sectors * 128 bytes
@@ -153,6 +154,76 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
         case .msdosFAT12: return 1474560   // 1.44 MB floppy
         case .msdosFAT16: return 10485760 // 10 MB (typical)
         default: return 0  // Unknown or variable
+        }
+    }
+    
+    /// Whether this file system format supports subdirectories (hierarchical directory structure)
+    /// - `true`: File system supports nested subdirectories
+    /// - `false`: File system only supports flat directory structure
+    /// 
+    /// ## Examples
+    /// 
+    /// Formats with subdirectory support:
+    /// - `.proDOS` - Supports nested subdirectories
+    /// - `.iso9660` - Supports directory hierarchies
+    /// - `.fat32` - Supports nested directories
+    /// 
+    /// Formats with flat directory only:
+    /// - `.appleDOS33` - Single catalog, no subdirectories
+    /// - `.c64_1541` - Single directory, no subdirectories
+    /// - `.atariDOS20`, `.atariDOS25` - Single directory, no subdirectories
+    public var supportsSubdirectories: Bool {
+        switch self {
+        // Modern formats - all support subdirectories
+        case .iso9660, .fat32, .ntfs, .exfat:
+            return true
+        
+        // Apple II formats
+        case .appleDOS33: return false  // DOS 3.3: Flat catalog only
+        case .proDOS: return true       // ProDOS: Supports subdirectories
+        case .ucsdPascal: return true   // Pascal: Supports subdirectories
+        case .appleCorvus: return true  // Corvus: Supports subdirectories
+        case .appleCassette: return false // Cassette: Flat structure
+        case .appleIICPM: return false  // CP/M: Flat directory structure (user numbers provide grouping)
+        
+        // Apple III formats
+        case .sos: return true          // SOS: Supports subdirectories
+        case .appleIIIPascal: return true // Apple III Pascal: Supports subdirectories
+        
+        // Apple Lisa
+        case .lisaLFS: return true      // Lisa File System: Supports subdirectories
+        
+        // Commodore 64 formats
+        case .c64_1541: return false    // 1541: Flat directory only
+        case .c64_1581: return false    // 1581: Flat directory only
+        case .c64_TAP, .c64_T64: return false // Tape formats: Flat structure
+        
+        // Atari 8-bit formats
+        case .atariDOS20, .atariDOS25: return false // Atari DOS: Flat directory only
+        
+        // CP/M
+        case .cpm22: return false       // CP/M: Flat directory structure
+        
+        // ZX Spectrum formats
+        case .zxSpectrumTRDOS: return false // TR-DOS: Flat directory
+        case .zxSpectrumMGT: return false   // MGT: Flat directory
+        case .zxSpectrumPlus3DOS: return true // Plus3DOS: Supports subdirectories
+        case .zxSpectrumTAP, .zxSpectrumTZX: return false // Tape formats: Flat structure
+        
+        // MS-DOS/PC-DOS formats
+        case .msdosFAT12, .msdosFAT16: return true // FAT: Supports subdirectories
+        
+        // Macintosh formats
+        case .macMFS, .macHFS: return true // Mac file systems: Support subdirectories
+        
+        // OS/2
+        case .os2HPFS: return true // HPFS: Supports subdirectories
+        
+        // Sun
+        case .sunUFS: return true // UFS: Supports subdirectories
+        
+        // Amiga formats
+        case .amigaOFS, .amigaFFS: return true // Amiga file systems: Support subdirectories
         }
     }
     
@@ -184,8 +255,8 @@ public enum FileSystemFormat: String, Codable, CaseIterable, Sendable {
             // For vintage formats, estimate inception year based on format
             let vintageYear: Int
             switch self {
-            case .apple2DOS33: vintageYear = 1978
-            case .apple2ProDOS: vintageYear = 1983
+            case .appleDOS33: vintageYear = 1978
+            case .proDOS: vintageYear = 1983
             case .c64_1541: vintageYear = 1982
             case .c64_1581: vintageYear = 1987
             case .atariDOS20, .atariDOS25: vintageYear = 1980

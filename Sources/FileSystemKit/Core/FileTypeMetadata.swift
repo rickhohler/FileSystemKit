@@ -64,8 +64,24 @@ import Foundation
 /// - [IANA Media Types](https://www.iana.org/assignments/media-types/)
 public protocol FileTypeMetadata: Sendable {
     /// Uniform Type Identifier (UTI) - reverse-DNS style identifier
-    /// Example: "com.apple.disk-image.prodos-order"
-    /// Format: [reverse-DNS].[category].[subcategory].[variant]
+    /// Example: "com.apple.disk-image.dsk.prodos" (DSK format containing ProDOS file system)
+    /// Format: [reverse-DNS].[category].[layer2-format].[layer3-format]
+    /// 
+    /// **Layer 2 (Disk Image Format)**: Required - represents how the disk image is stored in the file
+    ///   Examples: dsk, woz, 2mg, d64, atr
+    /// 
+    /// **Layer 3 (File System Format)**: Optional - represents the file system structure inside the disk image
+    ///   Examples: dos33, prodos, sos, pascal
+    ///   Omitted if file system is unknown, unformatted, or copy-protected
+    /// 
+    /// **Both layers are included** because the same disk image format can contain different file systems.
+    /// For example, a `.dsk` file can contain DOS 3.3, ProDOS, or be unformatted.
+    /// 
+    /// Examples:
+    /// - `com.apple.disk-image.dsk.dos33` - DSK format containing DOS 3.3
+    /// - `com.apple.disk-image.dsk.prodos` - DSK format containing ProDOS
+    /// - `com.apple.disk-image.woz.dos33` - WOZ format containing DOS 3.3
+    /// - `com.apple.disk-image.dsk` - DSK format, unknown/unformatted file system
     var typeIdentifier: String { get }
     
     /// Short identifier for the file type (3-8 characters, lowercase)
@@ -349,8 +365,20 @@ public extension FileTypeMetadata {
 /// Provides a centralized registry for looking up file types by various
 /// identifiers (type identifier, short ID, extension, magic number).
 public actor FileTypeMetadataRegistry {
-    /// Shared singleton instance
-    public static let shared = FileTypeMetadataRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    nonisolated(unsafe) private static var _shared: FileTypeMetadataRegistry?
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy)
+    public static var shared: FileTypeMetadataRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared == nil {
+            _shared = FileTypeMetadataRegistry()
+        }
+        return _shared!
+    }
     
     /// Registered metadata (typeIdentifier -> metadata)
     private var byTypeIdentifier: [String: any FileTypeMetadata] = [:]

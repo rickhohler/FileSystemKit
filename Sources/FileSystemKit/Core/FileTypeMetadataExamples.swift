@@ -12,21 +12,23 @@ import Foundation
 ///
 /// This demonstrates how to implement FileTypeMetadata for a vintage disk image format.
 /// The format uses:
-/// - UTI-style identifier: "com.apple.disk-image.prodos-order"
-/// - Short ID: "apo"
-/// - Display name: "Apple II Disk Image Prodos Order"
+/// - UTI-style identifier: "com.apple.disk-image.dsk.prodos" (DSK format containing ProDOS)
+/// - Short ID: "apd" (Apple ProDOS Disk)
+/// - Display name: "Apple II Disk Image (DSK) - ProDOS"
 /// - Magic number detection for ProDOS format
+/// 
+/// **Note**: The UTI includes both Layer 2 (disk image format: dsk) and Layer 3 (file system format: prodos)
 public struct AppleIIProDOSDiskImageMetadata: FileTypeMetadata {
     public var typeIdentifier: String {
-        "com.apple.disk-image.prodos-order"
+        "com.apple.disk-image.dsk.prodos"
     }
     
     public var shortID: String {
-        "apo"
+        "apd"  // Apple ProDOS Disk
     }
     
     public var displayName: String {
-        "Apple II Disk Image Prodos Order"
+        "Apple II Disk Image (DSK) - ProDOS"
     }
     
     public var version: FileTypeVersion? {
@@ -34,7 +36,7 @@ public struct AppleIIProDOSDiskImageMetadata: FileTypeMetadata {
     }
     
     public var mimeType: String? {
-        "application/x-apple-diskimage-prodos"
+        "application/x-apple-diskimage-dsk-prodos"  // Includes both Layer 2 (dsk) and Layer 3 (prodos)
     }
     
     public var extensions: [String] {

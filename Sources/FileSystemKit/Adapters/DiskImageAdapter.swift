@@ -93,8 +93,20 @@ public protocol DiskImageAdapter: AnyObject {
 /// Thread-safe registry for disk image adapters
 /// Uses NSLock for synchronization to support concurrent access
 public final class DiskImageAdapterRegistry: @unchecked Sendable {
-    /// Shared singleton instance
-    public static let shared = DiskImageAdapterRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    nonisolated(unsafe) private static var _shared: DiskImageAdapterRegistry?
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy)
+    public static var shared: DiskImageAdapterRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared == nil {
+            _shared = DiskImageAdapterRegistry()
+        }
+        return _shared!
+    }
     
     /// Lock for thread-safe access
     private let lock = NSLock()

@@ -153,8 +153,20 @@ extension ChunkStorageProvider {
 public actor ChunkStorageProviderRegistry {
     private var providers: [String: any ChunkStorageProvider] = [:]
     
-    /// Shared singleton instance
-    public static let shared = ChunkStorageProviderRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    nonisolated(unsafe) private static var _shared: ChunkStorageProviderRegistry?
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy)
+    public static var shared: ChunkStorageProviderRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        if _shared == nil {
+            _shared = ChunkStorageProviderRegistry()
+        }
+        return _shared!
+    }
     
     private init() {
         // Register default file system provider asynchronously
