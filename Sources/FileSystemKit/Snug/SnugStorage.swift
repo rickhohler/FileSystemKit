@@ -6,14 +6,26 @@ import Foundation
 /// SNUG storage helper functions
 public struct SnugStorage {
     /// Get default storage directory
-    /// Checks SNUG_STORAGE environment variable, defaults to ~/.snug
+    /// Checks SNUG_STORAGE environment variable, defaults to ~/.snug (macOS) or Application Support (iOS)
     public static func defaultStorageDirectory() -> String {
         if let envStorage = ProcessInfo.processInfo.environment["SNUG_STORAGE"] {
             return envStorage
         }
         
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // On iOS/tvOS/watchOS, use Application Support directory
+        let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        guard let appSupportURL = urls.first else {
+            // Fallback to documents directory if application support is unavailable
+            let docURLs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            return docURLs.first?.appendingPathComponent(".snug").path ?? "/tmp/.snug"
+        }
+        return appSupportURL.appendingPathComponent(".snug").path
+        #else
+        // On macOS/Linux, use home directory
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         return "\(homeDir)/.snug"
+        #endif
     }
     
     /// Ensure storage directory exists

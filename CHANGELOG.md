@@ -5,7 +5,35 @@ All notable changes to FileSystemKit will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [Unreleased] - 2025-12-02
+
+### Added
+- **File Type Metadata**: Enhanced file type detection and metadata support
+  - `FileTypeMetadata` for structured file type information
+  - `FileTypeMetadataExamples` with comprehensive examples
+  - Support for ambiguous file extensions and format detection
+- **Vendor Protocol**: Vendor identification support
+  - `VendorProtocol` for vendor identification
+  - Integration with disk image adapters
+- **Enhanced Disk Image Adapters**: Improved disk image handling
+  - Enhanced `DiskImageAdapter` with vendor information support
+  - Updated `DiskImageFormat` with additional formats
+  - Enhanced `RawDiskData` with improved sector handling
+- **Pipeline Enhancements**: Improved pipeline processing
+  - Enhanced `Pipeline` with better error handling
+  - Improved chunk storage provider integration
+- **Documentation**: Comprehensive documentation additions
+  - CHUNK_STORAGE_CLIENT_USAGE.md: Client usage guide
+  - FILE_TYPE_METADATA.md: File type metadata guide
+  - FILE_TYPE_METADATA_AMBIGUOUS_EXTENSIONS.md: Ambiguous extensions handling
+  - FILE_TYPE_METADATA_DESIGN.md: Design documentation
+  - VENDOR_PROTOCOL.md: Vendor protocol documentation
+  - VENDOR_CLIENT_IMPLEMENTATION.md: Client implementation guide
+  - VENDOR_USAGE_EXAMPLES.md: Usage examples
+
+### Changed
+- Enhanced `SnugConfig` and `SnugStorage` with improved configuration options
+- Improved `ChunkStorageProvider` integration
 
 ## [1.6.0] - 2025-12-02
 

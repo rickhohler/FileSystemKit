@@ -136,9 +136,21 @@ public struct StorageLocation: Codable, Sendable {
 public struct SnugConfigManager {
     /// Get configuration file path
     public static func configFilePath() -> URL {
+        #if os(iOS) || os(tvOS) || os(watchOS)
+        // On iOS/tvOS/watchOS, use Application Support directory
+        let urls = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)
+        guard let appSupportURL = urls.first else {
+            // Fallback to documents directory if application support is unavailable
+            let docURLs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)
+            return docURLs.first?.appendingPathComponent(".snug").appendingPathComponent("config.yaml") ?? URL(fileURLWithPath: "/tmp/.snug/config.yaml")
+        }
+        return appSupportURL.appendingPathComponent(".snug").appendingPathComponent("config.yaml")
+        #else
+        // On macOS/Linux, use home directory
         let homeDir = FileManager.default.homeDirectoryForCurrentUser.path
         let configDir = "\(homeDir)/.snug"
         return URL(fileURLWithPath: configDir).appendingPathComponent("config.yaml")
+        #endif
     }
     
     /// Validate configuration and return validation results

@@ -58,8 +58,22 @@ public protocol DiskImageAdapter: AnyObject {
     static func extractMetadata(metadataStorage: MetadataStorage, hash: DiskImageHash) async throws -> DiskImageMetadata?
     
     /// Extract metadata from disk image data without fully reading it
+    ///
+    /// Adapters should extract vendor information (publisher, developer, copyright) from disk image
+    /// content when possible. Vendor information is typically found in:
+    /// - Format-specific metadata headers/blocks
+    /// - File system metadata (volume labels, directory entries)
+    /// - Embedded text files (README, COPYRIGHT, etc.)
+    /// - Disk label/name fields that may contain vendor information
+    ///
+    /// **Important**: Vendor identification should come from disk image content (metadata fields),
+    /// not from the disk image format itself. The format indicates the platform (computer make/model),
+    /// not the software vendor.
+    ///
     /// - Parameter data: Disk image data (may be partial for format detection)
-    /// - Returns: DiskImageMetadata if available, `nil` if metadata cannot be extracted
+    /// - Returns: DiskImageMetadata if available, `nil` if metadata cannot be extracted.
+    ///   Should include `publisher`, `developer`, and/or `copyright` fields when vendor information
+    ///   can be determined from the disk image content.
     /// - Throws: DiskImageError if the metadata cannot be extracted
     static func extractMetadata(from data: Data) throws -> DiskImageMetadata?
     

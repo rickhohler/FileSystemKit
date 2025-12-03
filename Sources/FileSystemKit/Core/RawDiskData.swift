@@ -369,6 +369,17 @@ public struct DiskImageMetadata: Codable, Sendable {
     /// Created automatically based on disk image format detection
     public var tags: [String]
     
+    /// Vendor identifier (UUID) - references a vendor from vendor storage
+    /// Identified automatically based on disk image format and file system format
+    /// nil if vendor cannot be identified
+    public var vendorID: UUID?
+    
+    /// Vendor name - human-readable vendor name
+    /// Identified automatically based on disk image format and file system format
+    /// This is a convenience field; the canonical vendor data is stored via vendorID
+    /// nil if vendor cannot be identified
+    public var vendorName: String?
+    
     public init(
         title: String? = nil,
         publisher: String? = nil,
@@ -383,7 +394,9 @@ public struct DiskImageMetadata: Codable, Sendable {
         contributor: String? = nil,
         geometry: DiskGeometry? = nil,
         copyProtection: CopyProtectionInfo? = nil,
-        tags: [String] = []
+        tags: [String] = [],
+        vendorID: UUID? = nil,
+        vendorName: String? = nil
     ) {
         self.title = title
         self.publisher = publisher
@@ -399,6 +412,8 @@ public struct DiskImageMetadata: Codable, Sendable {
         self.geometry = geometry
         self.copyProtection = copyProtection
         self.tags = tags
+        self.vendorID = vendorID
+        self.vendorName = vendorName
     }
 }
 

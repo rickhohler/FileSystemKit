@@ -51,6 +51,9 @@ public struct PipelineContext: @unchecked Sendable {
     /// Errors encountered during processing
     public var errors: [Error] = []
     
+    /// Warnings encountered during processing (non-fatal issues)
+    public var warnings: [String] = []
+    
     /// Results accumulated by stages
     public var results: [PipelineResult] = []
     
@@ -63,6 +66,11 @@ public struct PipelineContext: @unchecked Sendable {
         errors.isEmpty || !errors.contains { $0 is PipelineFatalError }
     }
 }
+
+// MARK: - Pipeline Context Extensions
+//
+// Note: Typed accessors for RetroboxFSCore-specific stage outputs are provided
+// in RetroboxFSCore/Pipeline/PipelineContext+Extensions.swift to avoid circular dependencies.
 
 /// Type-erased Sendable value for stage data dictionary
 public struct AnySendable: @unchecked Sendable {

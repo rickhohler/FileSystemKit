@@ -23,15 +23,21 @@ public enum DiskImageFormat: String, Codable, CaseIterable, Sendable {
     case nib = "nib"               // NIB (Nibble) format with raw GCR data
     case hdv = "hdv"               // HDV (Hard Disk Volume) format for ProDOS
     case twoMG = "2mg"             // 2MG (Universal) Apple II disk image format
+    case po = "po"                 // ProDOS disk image format
+    case `do` = "do"               // DOS 3.3 disk image format
+    case d13 = "d13"               // DOS 3.3 disk image format (13-sector)
     
     // Commodore formats
     case d64 = "d64"               // Commodore 64 1541 disk images
+    case d71 = "d71"               // Commodore 64 1571 disk images
     case d81 = "d81"               // Commodore 64 1581 disk images
     case tap = "tap"               // Commodore 64 cassette tape
     case t64 = "t64"               // Commodore 64 tape archive
     
     // Atari formats
     case atr = "atr"               // Atari 8-bit disk images
+    case xfd = "xfd"               // Atari XFD disk image format
+    case st = "st"                 // Atari ST disk image format
     
     // Apple II cassette formats
     case cass = "cass"             // Apple II cassette tape
@@ -67,11 +73,17 @@ public enum DiskImageFormat: String, Codable, CaseIterable, Sendable {
         case .nib: return ["nib"]
         case .hdv: return ["hdv"]
         case .twoMG: return ["2mg"]
+        case .po: return ["po"]
+        case .`do`: return ["do"]
+        case .d13: return ["d13"]
         case .d64: return ["d64"]
+        case .d71: return ["d71"]
         case .d81: return ["d81"]
         case .tap: return ["tap"]
         case .t64: return ["t64"]
         case .atr: return ["atr"]
+        case .xfd: return ["xfd"]
+        case .st: return ["st"]
         case .cass: return ["cass"]
         case .wav: return ["wav"]
         case .lisa: return ["lisa"]
