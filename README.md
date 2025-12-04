@@ -186,7 +186,7 @@ See [docs/REGISTRY_PATTERN.md](../docs/REGISTRY_PATTERN.md) for details.
 
 - Swift 6.0+
 - macOS 12.0+ / iOS 15.0+ / tvOS 15.0+ / watchOS 8.0+
-- DesignAlgorithmsKit 1.0.2+
+- DesignAlgorithmsKit 1.0.3+
 
 ## Quick Start
 

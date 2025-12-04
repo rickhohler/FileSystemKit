@@ -23,7 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FileSystemStrategy` now conforms to `DesignAlgorithmsKit.Strategy` protocol
 
 ### Dependencies
-- Updated `DesignAlgorithmsKit` to 1.0.2+
+- Updated `DesignAlgorithmsKit` to 1.0.3+
 
 ## [1.7.0] - 2025-12-03
 
