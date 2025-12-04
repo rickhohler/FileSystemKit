@@ -155,17 +155,24 @@ public actor ChunkStorageProviderRegistry {
     
     /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
     // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
-    nonisolated(unsafe) private static var _shared: ChunkStorageProviderRegistry?
+    /// Lock for thread-safe initialization
     nonisolated private static let lock = NSLock()
     
-    /// Shared singleton instance (lazy)
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
     public static var shared: ChunkStorageProviderRegistry {
         lock.lock()
         defer { lock.unlock() }
-        if _shared == nil {
-            _shared = ChunkStorageProviderRegistry()
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: ChunkStorageProviderRegistry?
         }
-        return _shared!
+        
+        if Static.instance == nil {
+            Static.instance = ChunkStorageProviderRegistry()
+        }
+        
+        return Static.instance!
     }
     
     private init() {

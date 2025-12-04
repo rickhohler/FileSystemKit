@@ -17,16 +17,22 @@ File extensions are unreliable for file type identification:
 The `FileTypeMetadata` protocol provides:
 
 1. **UTI-style identifiers** (reverse-DNS naming)
-   - Example: `com.apple.disk-image.dsk.prodos` (DSK format containing ProDOS)
-   - Format: `[reverse-DNS].[category].[layer2-format].[layer3-format]`
+   - Example: `com.apple.disk-image.dsk.prodos.v2.4` (DSK format containing ProDOS 2.4)
+   - Format: `[reverse-DNS].[category].[layer2-format].[layer3-format].[version]`
    - **Layer 2 (Disk Image Format)**: How the disk image is stored (dsk, woz, 2mg, etc.)
    - **Layer 3 (File System Format)**: The operating system's file system structure (dos33, prodos, sos, pascal, etc.)
+   - **Version**: File system version (v3.3, v2.4, v1.0, etc.) - optional
    - **Both layers are included** because the same disk image format can contain different file systems
+   - **Version is included** to distinguish between file system versions (e.g., DOS 3.1 vs 3.2 vs 3.3)
    - Examples:
-     - `com.apple.disk-image.dsk.dos33` - DSK format containing DOS 3.3
-     - `com.apple.disk-image.dsk.prodos` - DSK format containing ProDOS
-     - `com.apple.disk-image.woz.dos33` - WOZ format containing DOS 3.3
-     - `com.apple.disk-image.2mg.prodos` - 2MG format containing ProDOS
+     - `com.apple.disk-image.dsk.dos33.v3.3` - DSK format containing DOS 3.3 (dos33 in layer 3)
+     - `com.apple.disk-image.dsk.dos32.v3.2` - DSK format containing DOS 3.2 (dos32 in layer 3)
+     - `com.apple.disk-image.dsk.dos31.v3.1` - DSK format containing DOS 3.1 (dos31 in layer 3)
+     - `com.apple.disk-image.dsk.prodos.v2.4` - DSK format containing ProDOS 2.4
+     - `com.apple.disk-image.dsk.prodos.v1.0` - DSK format containing ProDOS 1.0
+     - `com.apple.disk-image.dsk.prodos` - DSK format containing ProDOS (version unknown)
+     - `com.apple.disk-image.woz.dos33.v3.3` - WOZ format containing DOS 3.3
+     - `com.apple.disk-image.2mg.prodos.v2.4` - 2MG format containing ProDOS 2.4
      - `com.apple.disk-image.dsk` - DSK format, unknown/unformatted file system
 
 2. **Short IDs** (3-8 characters, lowercase)
@@ -56,14 +62,21 @@ The `FileTypeMetadata` protocol provides:
 ### UTI (Uniform Type Identifier)
 
 Apple's UTI system uses reverse-DNS naming:
-- **Format**: `com.vendor.category.layer2-format.layer3-format`
-- **Example**: `com.apple.disk-image.dsk.prodos` (DSK disk image containing ProDOS file system)
-- **Benefits**: Hierarchical, namespaced, unambiguous, explicitly represents both disk image format and file system format
+- **Format**: `com.vendor.category.layer2-format.layer3-format.version`
+- **Example**: `com.apple.disk-image.dsk.prodos.v2.4` (DSK disk image containing ProDOS 2.4 file system)
+- **Benefits**: Hierarchical, namespaced, unambiguous, explicitly represents both disk image format and file system format with version
 - **Layer 2 (Disk Image Format)**: Required - represents how the disk image is stored in the file
 - **Layer 3 (File System Format)**: Optional - represents the file system structure inside the disk image
   - Omitted if file system is unknown, unformatted, or copy-protected
+- **Version**: Optional - file system version (v3.3, v2.4, v1.0, etc.)
+  - Format: `vMajor.Minor` (e.g., `v3.3`, `v2.4`)
+  - Omitted if version cannot be determined or is not applicable
+  - Only included when Layer 3 (file system format) is present
   - Examples:
-    - `com.apple.disk-image.dsk.prodos` - DSK format with ProDOS file system
+    - `com.apple.disk-image.dsk.prodos.v2.4` - DSK format with ProDOS 2.4 file system
+    - `com.apple.disk-image.dsk.prodos.v1.0` - DSK format with ProDOS 1.0 file system
+    - `com.apple.disk-image.dsk.prodos` - DSK format with ProDOS (version unknown)
+    - `com.apple.disk-image.dsk.dos33.v3.3` - DSK format with DOS 3.3 file system
     - `com.apple.disk-image.dsk` - DSK format, file system unknown/unformatted
     - `com.apple.disk-image.woz` - WOZ format, may be copy-protected (file system detection not possible)
 

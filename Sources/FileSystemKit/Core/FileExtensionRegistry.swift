@@ -6,12 +6,15 @@
 // registry provides extension-to-type mapping that can be used by all projects.
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - FileExtensionRegistry
 
 /// Registry for mapping file extensions to types/identifiers.
 /// Provides a general-purpose extension registration system that can be used
 /// by FileSystemKit and packages that extend it.
+///
+/// Uses DesignAlgorithmsKit.ActorSingleton protocol for singleton management.
 ///
 /// ## Usage Example
 /// ```swift
@@ -29,20 +32,25 @@ import Foundation
 /// // Get all extensions for a type
 /// let extensions = await registry.extensions(forType: "disk-image")
 /// ```
-public actor FileExtensionRegistry {
-    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
-    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
-    nonisolated(unsafe) private static var _shared: FileExtensionRegistry?
+public actor FileExtensionRegistry: ActorSingleton {
+    /// Lock for thread-safe initialization
     nonisolated private static let lock = NSLock()
     
-    /// Shared singleton instance (lazy)
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
     public static var shared: FileExtensionRegistry {
         lock.lock()
         defer { lock.unlock() }
-        if _shared == nil {
-            _shared = FileExtensionRegistry()
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: FileExtensionRegistry?
         }
-        return _shared!
+        
+        if Static.instance == nil {
+            Static.instance = FileExtensionRegistry()
+        }
+        
+        return Static.instance!
     }
     
     /// Extension to type mapping (extension -> type)

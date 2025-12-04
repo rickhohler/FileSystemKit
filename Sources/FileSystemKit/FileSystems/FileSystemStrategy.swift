@@ -15,6 +15,7 @@
 // Note: Vintage file systems (pre-2000) can be handled by packages that extend FileSystemKit
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - FormatParameters
 
@@ -139,7 +140,8 @@ public struct FormatParameters: Codable {
 /// - ``FileSystemFolder`` - Result of parsing
 /// - ``FileSystemEntry`` - File metadata
 /// - [Strategy Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Strategy_pattern) - Design pattern for algorithms
-public protocol FileSystemStrategy {
+/// - Uses DesignAlgorithmsKit.Strategy protocol for strategy identification
+public protocol FileSystemStrategy: Strategy {
     /// File system format this strategy handles
     static var format: FileSystemFormat { get }
     
@@ -239,6 +241,11 @@ public protocol FileSystemStrategy {
 // MARK: - FileSystemStrategy Default Implementations
 
 extension FileSystemStrategy {
+    /// Default implementation: Strategy ID uses format rawValue
+    public var strategyID: String {
+        Self.format.rawValue
+    }
+    
     /// Default implementation: Instance property delegates to static property
     public var supportsSubdirectories: Bool {
         Self.supportsSubdirectories

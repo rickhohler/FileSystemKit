@@ -2,9 +2,13 @@
 // Bootability Detector Protocol and Registry
 //
 // This file defines the protocol for bootability detection and a registry for managing detectors.
+//
+// Design Pattern: Uses DesignAlgorithmsKit.TypeRegistry internally for type storage
+// while maintaining domain-specific API for detector discovery
 // Vintage-specific implementations register themselves to provide bootability detection for their platforms.
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - BootabilityDetector Protocol
 
@@ -66,23 +70,31 @@ public protocol BootabilityDetector: Sendable {
 /// }
 /// ```
 public final class BootabilityDetectorRegistry: @unchecked Sendable {
-    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
-    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
-    nonisolated(unsafe) private static var _shared: BootabilityDetectorRegistry?
+    /// Lock for thread-safe initialization
     nonisolated private static let lock = NSLock()
     
-    /// Shared singleton instance (lazy)
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
     public static var shared: BootabilityDetectorRegistry {
         lock.lock()
         defer { lock.unlock() }
-        if _shared == nil {
-            _shared = BootabilityDetectorRegistry()
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: BootabilityDetectorRegistry?
         }
-        return _shared!
+        
+        if Static.instance == nil {
+            Static.instance = BootabilityDetectorRegistry()
+        }
+        
+        return Static.instance!
     }
     
     /// Lock for thread-safe access
     private let lock = NSLock()
+    
+    /// TypeRegistry from DesignAlgorithmsKit for type storage
+    private let typeRegistry = TypeRegistry.shared
     
     /// Registered detectors by file system format
     /// Multiple detectors can be registered for the same format (first match wins)
@@ -98,11 +110,16 @@ public final class BootabilityDetectorRegistry: @unchecked Sendable {
     /// Register a bootability detector
     /// - Parameter detector: The detector type to register
     /// Thread-safe: Can be called concurrently
+    /// Uses DesignAlgorithmsKit.TypeRegistry internally for type storage
     ///
     /// If multiple detectors are registered for the same format, they are tried in registration order.
     public func register(_ detector: any BootabilityDetector.Type) {
         lock.lock()
         defer { lock.unlock() }
+        
+        // Register in TypeRegistry using detector type name as key
+        let detectorKey = String(describing: detector)
+        typeRegistry.register(detector, key: detectorKey)
         
         // Add to ordered list if not already registered
         if !detectorOrder.contains(where: { type(of: $0) == type(of: detector) }) {

@@ -23,6 +23,7 @@ let package = Package(
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.0"),
         .package(url: "https://github.com/jpsim/Yams.git", from: "5.1.2"),
+        .package(url: "https://github.com/rickhohler/DesignAlgorithmsKit.git", from: "1.0.2"),
     ],
     targets: [
         // Core library target containing file system functionality
@@ -30,6 +31,7 @@ let package = Package(
             name: "FileSystemKit",
             dependencies: [
                 .product(name: "Yams", package: "Yams"),
+                .product(name: "DesignAlgorithmsKit", package: "DesignAlgorithmsKit"),
             ],
             path: "Sources/FileSystemKit",
             exclude: []
