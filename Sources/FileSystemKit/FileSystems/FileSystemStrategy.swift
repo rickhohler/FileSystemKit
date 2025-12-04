@@ -15,6 +15,7 @@
 // Note: Vintage file systems (pre-2000) can be handled by packages that extend FileSystemKit
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - FormatParameters
 
@@ -139,9 +140,27 @@ public struct FormatParameters: Codable {
 /// - ``FileSystemFolder`` - Result of parsing
 /// - ``FileSystemEntry`` - File metadata
 /// - [Strategy Pattern (Wikipedia)](https://en.wikipedia.org/wiki/Strategy_pattern) - Design pattern for algorithms
-public protocol FileSystemStrategy {
+/// - Uses DesignAlgorithmsKit.Strategy protocol for strategy identification
+public protocol FileSystemStrategy: Strategy {
     /// File system format this strategy handles
     static var format: FileSystemFormat { get }
+    
+    /// Whether this file system supports subdirectories (hierarchical directory structure)
+    /// - `true`: File system supports nested subdirectories (e.g., ProDOS, ISO9660, FAT32)
+    /// - `false`: File system only supports flat directory structure (e.g., DOS 3.3, Commodore 64)
+    /// 
+    /// ## Examples
+    /// 
+    /// File systems with subdirectory support:
+    /// - ProDOS: Supports nested subdirectories
+    /// - ISO9660: Supports directory hierarchies
+    /// - FAT32: Supports nested directories
+    /// 
+    /// File systems with flat directory only:
+    /// - Apple DOS 3.3: Single catalog, no subdirectories
+    /// - Commodore 64 (1541): Single directory, no subdirectories
+    /// - Atari DOS: Single directory, no subdirectories
+    static var supportsSubdirectories: Bool { get }
     
     /// Check if this strategy can handle the given raw disk data
     /// - Parameter diskData: Raw disk data to check
@@ -213,11 +232,24 @@ public protocol FileSystemStrategy {
     
     /// Get block/sector size in bytes
     var blockSize: Int { get }
+    
+    /// Whether this file system instance supports subdirectories
+    /// Delegates to the static `supportsSubdirectories` property
+    var supportsSubdirectories: Bool { get }
 }
 
 // MARK: - FileSystemStrategy Default Implementations
 
 extension FileSystemStrategy {
+    /// Default implementation: Strategy ID uses format rawValue
+    public var strategyID: String {
+        Self.format.rawValue
+    }
+    
+    /// Default implementation: Instance property delegates to static property
+    public var supportsSubdirectories: Bool {
+        Self.supportsSubdirectories
+    }
     /// Default implementation: Read file from ChunkStorage
     /// Converts ChunkIdentifier to diskData-based read for backward compatibility
     public func readFile(_ file: FileSystemEntry, chunkStorage: ChunkStorage, identifier: ChunkIdentifier) async throws -> Data {
@@ -254,27 +286,34 @@ extension FileSystemStrategy {
 /// Factory for creating and detecting file system strategies
 public class FileSystemStrategyFactory {
     /// Registered strategies (format -> strategy type)
-    /// Note: This is typically initialized at startup, so concurrency safety is managed by initialization order
-    nonisolated(unsafe) private static var registeredStrategies: [FileSystemFormat: FileSystemStrategy.Type] = [:]
+    /// Use thread-safe lazy initialization to avoid static initialization order issues
+    nonisolated(unsafe) private static var _registeredStrategies: [FileSystemFormat: FileSystemStrategy.Type]?
+    nonisolated private static let lock = NSLock()
     
-    /// Initialize default strategies
-    private static func initializeDefaults() {
-        // Register ISO9660 strategy
-        register(ISO9660FileSystemStrategy.self)
-    }
-    
-    /// Ensure defaults are initialized (called on first access)
-    private static func ensureInitialized() {
-        if registeredStrategies.isEmpty {
-            initializeDefaults()
+    /// Thread-safe access to registered strategies
+    private static var registeredStrategies: [FileSystemFormat: FileSystemStrategy.Type] {
+        lock.lock()
+        defer { lock.unlock() }
+        if _registeredStrategies == nil {
+            _registeredStrategies = [:]
+            // Initialize defaults without recursion
+            _registeredStrategies?[ISO9660FileSystemStrategy.format] = ISO9660FileSystemStrategy.self
         }
+        return _registeredStrategies!
     }
     
     /// Register a file system strategy
     /// - Parameter strategyType: Strategy type to register
+    /// Thread-safe: Can be called concurrently
     public static func register<T: FileSystemStrategy>(_ strategyType: T.Type) {
-        ensureInitialized()
-        registeredStrategies[T.format] = strategyType
+        lock.lock()
+        defer { lock.unlock() }
+        if _registeredStrategies == nil {
+            _registeredStrategies = [:]
+            // Initialize defaults without recursion
+            _registeredStrategies?[ISO9660FileSystemStrategy.format] = ISO9660FileSystemStrategy.self
+        }
+        _registeredStrategies?[strategyType.format] = strategyType
     }
     
     /// Get all registered strategies
@@ -286,11 +325,19 @@ public class FileSystemStrategyFactory {
     /// Detect file system format in raw disk data
     /// - Parameter diskData: Raw disk data to analyze
     /// - Returns: Detected file system format, or nil if unknown
+    /// - Note: This detects the file system format (Layer 3), not the disk image format (Layer 2)
+    ///   The disk image format should already be detected and stored in diskData.metadata.detectedDiskImageFormat
     public static func detectFormat(in diskData: RawDiskData) -> FileSystemFormat? {
-        ensureInitialized()
+        // Access registeredStrategies property (which ensures initialization)
+        let strategies = registeredStrategies
         // Try each registered strategy
-        for strategyType in registeredStrategies.values {
+        for strategyType in strategies.values {
             if let format = strategyType.detectFormat(in: diskData) {
+                // Store detected format in metadata
+                if diskData.metadata == nil {
+                    diskData.metadata = DiskImageMetadata()
+                }
+                diskData.metadata?.detectedFileSystemFormat = format
                 return format
             }
         }
@@ -302,7 +349,7 @@ public class FileSystemStrategyFactory {
     /// - Returns: Strategy instance, or nil if not registered
     /// - Note: This creates a "detection-only" instance. For parsing, use `createStrategy(for:diskData:)` instead.
     public static func createStrategy(for format: FileSystemFormat) -> FileSystemStrategy? {
-        ensureInitialized()
+        // Access registeredStrategies property (which ensures initialization)
         guard registeredStrategies[format] != nil else {
             return nil
         }
@@ -319,7 +366,7 @@ public class FileSystemStrategyFactory {
     ///   - diskData: Raw disk data to parse
     /// - Returns: Strategy instance, or nil if not registered or initialization fails
     public static func createStrategy(for format: FileSystemFormat, diskData: RawDiskData) throws -> FileSystemStrategy? {
-        ensureInitialized()
+        // Access registeredStrategies property (which ensures initialization)
         guard registeredStrategies[format] != nil else {
             return nil
         }

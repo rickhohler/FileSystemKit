@@ -4,7 +4,7 @@
 
 The `FileTypeMetadata` protocol provides industry-standard file type identification beyond simple file extensions. It enables file types to be identified using:
 
-- **UTI-style identifiers** (e.g., `com.apple.disk-image.prodos-order`)
+- **UTI-style identifiers** (e.g., `com.apple.disk-image.dsk.prodos` - includes both disk image format and file system format)
 - **Short IDs** (e.g., `apo`)
 - **Human-readable names** (e.g., "Apple II Disk Image Prodos Order")
 - **Version information** (semantic versioning)
@@ -35,16 +35,25 @@ The `FileTypeMetadata` protocol provides:
 ### UTI (Uniform Type Identifier)
 
 Apple's UTI system uses reverse-DNS naming:
-- Format: `com.vendor.category.subcategory.variant`
-- Example: `com.apple.disk-image.prodos-order`
-- Benefits: Hierarchical, namespaced, unambiguous
+- Format: `com.vendor.category.layer2-format.layer3-format.version`
+- Example: `com.apple.disk-image.dsk.prodos.v2.4` (DSK disk image containing ProDOS 2.4 file system)
+- Benefits: Hierarchical, namespaced, unambiguous, explicitly represents both disk image format and file system format with version
+- **Layer 2 (Disk Image Format)**: Required - how the disk image is stored (dsk, woz, 2mg, etc.)
+- **Layer 3 (File System Format)**: Optional - the file system structure inside (dos33, prodos, sos, etc.)
+  - Omitted if file system is unknown, unformatted, or copy-protected
+- **Version**: Optional - file system version (v3.3, v2.4, v1.0, etc.)
+  - Format: `vMajor.Minor` (e.g., `v3.3`, `v2.4`)
+  - Omitted if version cannot be determined or is not applicable
+  - Only included when Layer 3 (file system format) is present
+  - **Note**: For DOS formats, the layer 3 name reflects the version (dos31, dos32, dos33) to ensure dos33 specifically means DOS 3.3
 
 ### MIME Types (IANA Media Types)
 
 IANA maintains the official MIME type registry:
 - Format: `type/subtype`
-- Example: `application/x-apple-diskimage-prodos`
+- Example: `application/x-apple-diskimage-dsk-prodos` (includes both Layer 2 and Layer 3)
 - Benefits: Widely recognized, standardized
+- Both disk image format and file system format are included in the MIME type
 
 ### Versioning
 

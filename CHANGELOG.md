@@ -8,13 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- Future changes will be documented here
+- Integration with DesignAlgorithmsKit for common design patterns
+- All registries now use `TypeRegistry` internally for type storage
+- Actor-based registries conform to `ActorSingleton` protocol
+- `FileSystemStrategy` conforms to `Strategy` protocol
 
 ### Changed
-- Future changes will be documented here
+- `BootabilityDetectorRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
+- `FileTypeUTIRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` for provider storage
+- `FileExtensionRegistry` now conforms to `DesignAlgorithmsKit.ActorSingleton` protocol
+- `PipelineRegistry` now conforms to `DesignAlgorithmsKit.ActorSingleton` protocol
+- `DiskImageAdapterRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
+- `CompressionAdapterRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
+- `FileSystemStrategy` now conforms to `DesignAlgorithmsKit.Strategy` protocol
 
-### Fixed
-- Future changes will be documented here
+### Dependencies
+- Updated `DesignAlgorithmsKit` to 1.0.3+
 
 ## [1.7.0] - 2025-12-03
 

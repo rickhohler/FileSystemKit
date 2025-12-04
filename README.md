@@ -172,10 +172,21 @@ Other packages can depend on FileSystemKit and extend its functionality for spec
 4. **Async/Await**: Modern Swift concurrency support
 5. **Testable**: Comprehensive test coverage with mock implementations
 
+## Design Patterns
+
+FileSystemKit uses [DesignAlgorithmsKit](https://github.com/rickhohler/DesignAlgorithmsKit) for common design patterns:
+
+- **Registry Pattern**: All registries use `TypeRegistry` internally for type storage
+- **Singleton Pattern**: Actor-based registries conform to `ActorSingleton` protocol  
+- **Strategy Pattern**: `FileSystemStrategy` conforms to `Strategy` protocol
+
+See [docs/REGISTRY_PATTERN.md](../docs/REGISTRY_PATTERN.md) for details.
+
 ## Requirements
 
 - Swift 6.0+
 - macOS 12.0+ / iOS 15.0+ / tvOS 15.0+ / watchOS 8.0+
+- DesignAlgorithmsKit 1.0.3+
 
 ## Quick Start
 

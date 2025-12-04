@@ -26,6 +26,9 @@ import Foundation
 public struct ISO9660FileSystemStrategy: FileSystemStrategy {
     public static var format: FileSystemFormat { .iso9660 }
     
+    /// ISO 9660 supports hierarchical subdirectories
+    public static var supportsSubdirectories: Bool { true }
+    
     // ISO 9660 constants
     static let sectorSize = 2048
     static let volumeDescriptorSetStart = 16

@@ -118,31 +118,50 @@ public struct GzipCompressionAdapter: CompressionAdapter {
     
     #if canImport(Compression)
     private static func decompressGzip(data: Data) throws -> Data {
-        // Use Compression framework with DEFLATE algorithm
-        // GZIP uses DEFLATE compression, so we can use COMPRESSION_LZFSE or zlib
+        // Use Compression framework with zlib algorithm for DEFLATE decompression
+        // GZIP uses DEFLATE compression, which is compatible with zlib
         
-        // Allocate buffer for decompression (estimate 4x original size)
-        let bufferSize = max(data.count * 4, 1024 * 1024)  // At least 1MB
-        let destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+        // Allocate buffer for decompression (estimate 4x original size, but allow growth)
+        var bufferSize = max(data.count * 4, 1024 * 1024)  // Start with at least 1MB
+        var destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
         defer { destinationBuffer.deallocate() }
         
-        let destinationBufferSize = bufferSize
-        let result = data.withUnsafeBytes { sourceBuffer -> Int in
-            guard let baseAddress = sourceBuffer.baseAddress else {
-                return 0
+        var result: Int = 0
+        var attempts = 0
+        let maxAttempts = 3
+        
+        // Try decompression with increasing buffer sizes if needed
+        while attempts < maxAttempts {
+            let destinationBufferSize = bufferSize
+            result = data.withUnsafeBytes { sourceBuffer -> Int in
+                guard let baseAddress = sourceBuffer.baseAddress else {
+                    return 0
+                }
+                // Use zlib algorithm for DEFLATE decompression (GZIP uses DEFLATE)
+                // COMPRESSION_ZLIB is available in Compression framework
+                return compression_decode_buffer(
+                    destinationBuffer,
+                    destinationBufferSize,
+                    baseAddress.assumingMemoryBound(to: UInt8.self),
+                    data.count,
+                    nil,
+                    COMPRESSION_ZLIB  // Use zlib for DEFLATE/gzip compatibility
+                )
             }
-            // Use zlib algorithm for DEFLATE decompression (GZIP uses DEFLATE)
-            // Note: COMPRESSION_LZFSE is not compatible with DEFLATE
-            // We need to use a DEFLATE-compatible algorithm
-            // For now, try LZMA which is more compatible, but ideally we'd use zlib
-            return compression_decode_buffer(
-                destinationBuffer,
-                destinationBufferSize,
-                baseAddress.assumingMemoryBound(to: UInt8.self),
-                data.count,
-                nil,
-                COMPRESSION_LZMA  // More compatible than LZFSE for DEFLATE-like data
-            )
+            
+            if result > 0 {
+                // Success
+                break
+            }
+            
+            // If buffer was too small, try with larger buffer
+            if result == 0 && attempts < maxAttempts - 1 {
+                destinationBuffer.deallocate()
+                bufferSize *= 2
+                destinationBuffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+            }
+            
+            attempts += 1
         }
         
         if result == 0 {

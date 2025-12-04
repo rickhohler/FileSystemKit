@@ -319,6 +319,7 @@ public struct DiskImageHash: Hashable, Codable, Sendable {
 /// - `geometry` - Disk geometry information
 /// - `copyProtection` - Copy protection details
 /// - `tags` - Categorization tags
+/// - `bootability` - Bootability state and boot instructions
 ///
 /// ## See Also
 ///
@@ -380,6 +381,63 @@ public struct DiskImageMetadata: Codable, Sendable {
     /// nil if vendor cannot be identified
     public var vendorName: String?
     
+    /// Detected disk image format (Layer 2: how disk is stored in file)
+    /// Examples: .dsk, .woz, .d64, .atr, .dmg, .iso9660
+    /// This is the container format, not the file system format
+    /// Set by DiskImageAdapter when extracting raw disk data
+    public var detectedDiskImageFormat: DiskImageFormat?
+    
+    /// Detected file system format (Layer 3: operating system's file system structure)
+    /// Examples: .appleDOS33, .proDOS, .sos, .ucsdPascal, .c64_1541
+    /// This is the file system format within the disk image
+    /// Set by FileSystemStrategy when detecting format from raw disk data
+    public var detectedFileSystemFormat: FileSystemFormat?
+    
+    /// Detected file system version (Layer 3: version of the operating system's file system)
+    /// Examples: "3.3" for DOS 3.3, "2.4" for ProDOS 2.4, "1.0" for ProDOS 1.0
+    /// Format: Major.Minor (e.g., "3.3", "2.4", "1.0")
+    /// nil if version cannot be determined or is not applicable
+    /// Set by FileSystemStrategy when detecting format from raw disk data
+    /// 
+    /// **Deprecated**: Use `operatingSystemVersion` instead for structured version information
+    @available(*, deprecated, message: "Use operatingSystemVersion instead")
+    public var detectedFileSystemVersion: String? {
+        get {
+            return operatingSystemVersion?.version?.versionString
+        }
+        set {
+            if let versionString = newValue, let format = detectedFileSystemFormat {
+                operatingSystemVersion = OperatingSystemVersion(
+                    fileSystemFormat: format,
+                    version: Version(versionString, source: "VTOC/Volume Header")
+                )
+            } else {
+                operatingSystemVersion = nil
+            }
+        }
+    }
+    
+    /// Operating system version information (structured)
+    /// Contains file system format and version with parsing and comparison support
+    /// Set by FileSystemStrategy when detecting format from raw disk data
+    public var operatingSystemVersion: OperatingSystemVersion?
+    
+    /// Application version information (for entire disk image)
+    /// Represents the application/program stored on the disk image
+    /// Extracted from disk metadata, volume labels, or embedded information
+    public var applicationVersion: ApplicationVersion?
+    
+    /// File versions (for individual programs/files on the disk)
+    /// Dictionary mapping file names to their version information
+    /// Extracted from file metadata, directory entries, or file headers
+    public var fileVersions: [String: FileVersion]
+    
+    /// Bootability information for this disk image
+    /// Contains bootability state and boot instructions
+    /// Set automatically during disk image analysis based on detection of boot code patterns
+    /// and file system format analysis
+    public var bootability: BootInstructions?
+    
     public init(
         title: String? = nil,
         publisher: String? = nil,
@@ -396,7 +454,13 @@ public struct DiskImageMetadata: Codable, Sendable {
         copyProtection: CopyProtectionInfo? = nil,
         tags: [String] = [],
         vendorID: UUID? = nil,
-        vendorName: String? = nil
+        vendorName: String? = nil,
+        detectedDiskImageFormat: DiskImageFormat? = nil,
+        detectedFileSystemFormat: FileSystemFormat? = nil,
+        operatingSystemVersion: OperatingSystemVersion? = nil,
+        applicationVersion: ApplicationVersion? = nil,
+        fileVersions: [String: FileVersion] = [:],
+        bootability: BootInstructions? = nil
     ) {
         self.title = title
         self.publisher = publisher
@@ -414,6 +478,25 @@ public struct DiskImageMetadata: Codable, Sendable {
         self.tags = tags
         self.vendorID = vendorID
         self.vendorName = vendorName
+        self.detectedDiskImageFormat = detectedDiskImageFormat
+        self.detectedFileSystemFormat = detectedFileSystemFormat
+        
+        // Initialize version information
+        self.operatingSystemVersion = operatingSystemVersion
+        self.applicationVersion = applicationVersion
+        self.fileVersions = fileVersions
+        
+        // Set application version from legacy fields if available
+        if applicationVersion == nil, let versionString = version {
+            self.applicationVersion = ApplicationVersion(
+                name: title,
+                version: Version(versionString, source: "Metadata"),
+                publisher: publisher,
+                copyright: copyright
+            )
+        }
+        
+        self.bootability = bootability
     }
 }
 

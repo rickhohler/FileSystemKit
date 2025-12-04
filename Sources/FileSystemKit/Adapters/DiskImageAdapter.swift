@@ -7,8 +7,12 @@
 // (e.g., .dmg, .iso, .vhd, .img) and converts them to RawDiskData.
 //
 // Note: Vintage formats (pre-2000) can be handled by packages that extend FileSystemKit
+//
+// Design Pattern: Uses DesignAlgorithmsKit.TypeRegistry internally for type storage
+// while maintaining domain-specific API for adapter discovery
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - DiskImageAdapter Protocol
 
@@ -91,18 +95,39 @@ public protocol DiskImageAdapter: AnyObject {
 // MARK: - DiskImageAdapterRegistry
 
 /// Thread-safe registry for disk image adapters
-/// Uses NSLock for synchronization to support concurrent access
+/// Uses DesignAlgorithmsKit.TypeRegistry internally for type storage
+/// while maintaining domain-specific API for adapter discovery
 public final class DiskImageAdapterRegistry: @unchecked Sendable {
-    /// Shared singleton instance
-    public static let shared = DiskImageAdapterRegistry()
+    /// Lock for thread-safe initialization
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
+    public static var shared: DiskImageAdapterRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: DiskImageAdapterRegistry?
+        }
+        
+        if Static.instance == nil {
+            Static.instance = DiskImageAdapterRegistry()
+        }
+        
+        return Static.instance!
+    }
     
     /// Lock for thread-safe access
     private let lock = NSLock()
     
-    /// Registered adapters by format
+    /// TypeRegistry from DesignAlgorithmsKit for type storage
+    private let typeRegistry = TypeRegistry.shared
+    
+    /// Registered adapters by format (cached for fast lookup)
     private var adapters: [DiskImageFormat: DiskImageAdapter.Type] = [:]
     
-    /// Registered adapters by file extension
+    /// Registered adapters by file extension (cached for fast lookup)
     private var adaptersByExtension: [String: DiskImageAdapter.Type] = [:]
     
     /// Flag to track if default adapters have been registered
@@ -142,10 +167,15 @@ public final class DiskImageAdapterRegistry: @unchecked Sendable {
     /// Register a disk image adapter
     /// - Parameter adapter: The adapter type to register
     /// Thread-safe: Can be called concurrently
+    /// Uses DesignAlgorithmsKit.TypeRegistry internally for type storage
     public func register(_ adapter: DiskImageAdapter.Type) {
         lock.lock()
         defer { lock.unlock() }
         
+        // Register in TypeRegistry using format as key
+        typeRegistry.register(adapter, key: adapter.format.rawValue)
+        
+        // Cache for fast lookup
         adapters[adapter.format] = adapter
         
         // Register by extension
@@ -209,8 +239,22 @@ public final class DiskImageAdapterRegistry: @unchecked Sendable {
     /// Get adapter for a specific format
     /// - Parameter format: The disk image format
     /// - Returns: The adapter type for the format, or `nil` if not registered
+    /// Uses DesignAlgorithmsKit.TypeRegistry internally for type lookup
     public func adapter(for format: DiskImageFormat) -> DiskImageAdapter.Type? {
-        return adapters[format]
+        // Try cache first
+        if let cached = adapters[format] {
+            return cached
+        }
+        
+        // Fallback to TypeRegistry lookup
+        if let type = typeRegistry.find(for: format.rawValue) as? DiskImageAdapter.Type {
+            lock.lock()
+            defer { lock.unlock() }
+            adapters[format] = type // Cache for next time
+            return type
+        }
+        
+        return nil
     }
 }
 

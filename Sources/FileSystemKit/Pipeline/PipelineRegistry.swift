@@ -11,13 +11,32 @@
 // - Factory Pattern: Predefined pipeline factories
 
 import Foundation
+import DesignAlgorithmsKit
 
 // MARK: - Pipeline Registry
 
 /// Central registry for managing and discovering pipelines
-public actor PipelineRegistry {
-    /// Shared singleton instance
-    public static let shared = PipelineRegistry()
+/// Uses DesignAlgorithmsKit.ActorSingleton protocol for singleton management.
+public actor PipelineRegistry: ActorSingleton {
+    /// Lock for thread-safe initialization
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
+    public static var shared: PipelineRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: PipelineRegistry?
+        }
+        
+        if Static.instance == nil {
+            Static.instance = PipelineRegistry()
+        }
+        
+        return Static.instance!
+    }
     
     /// Registered pipelines by ID
     private var pipelines: [String: any Pipeline] = [:]

@@ -64,8 +64,32 @@ import Foundation
 /// - [IANA Media Types](https://www.iana.org/assignments/media-types/)
 public protocol FileTypeMetadata: Sendable {
     /// Uniform Type Identifier (UTI) - reverse-DNS style identifier
-    /// Example: "com.apple.disk-image.prodos-order"
-    /// Format: [reverse-DNS].[category].[subcategory].[variant]
+    /// Example: "com.apple.disk-image.dsk.prodos.v2.4" (DSK format containing ProDOS 2.4 file system)
+    /// Format: [reverse-DNS].[category].[layer2-format].[layer3-format].[version]
+    /// 
+    /// **Layer 2 (Disk Image Format)**: Required - represents how the disk image is stored in the file
+    ///   Examples: dsk, woz, 2mg, d64, atr
+    /// 
+    /// **Layer 3 (File System Format)**: Optional - represents the file system structure inside the disk image
+    ///   Examples: dos33, prodos, sos, pascal
+    ///   Omitted if file system is unknown, unformatted, or copy-protected
+    /// 
+    /// **Version**: Optional - represents the version of the file system format
+    ///   Format: vMajor.Minor (e.g., v3.3, v2.4, v1.0)
+    ///   Omitted if version cannot be determined or is not applicable
+    /// 
+    /// **Both layers are included** because the same disk image format can contain different file systems.
+    /// For example, a `.dsk` file can contain DOS 3.3, ProDOS, or be unformatted.
+    /// 
+    /// Examples:
+    /// - `com.apple.disk-image.dsk.dos33.v3.3` - DSK format containing DOS 3.3
+    /// - `com.apple.disk-image.dsk.dos33.v3.2` - DSK format containing DOS 3.2
+    /// - `com.apple.disk-image.dsk.dos33.v3.1` - DSK format containing DOS 3.1
+    /// - `com.apple.disk-image.dsk.prodos.v2.4` - DSK format containing ProDOS 2.4
+    /// - `com.apple.disk-image.dsk.prodos.v1.0` - DSK format containing ProDOS 1.0
+    /// - `com.apple.disk-image.dsk.prodos` - DSK format containing ProDOS (version unknown)
+    /// - `com.apple.disk-image.woz.dos33.v3.3` - WOZ format containing DOS 3.3
+    /// - `com.apple.disk-image.dsk` - DSK format, unknown/unformatted file system
     var typeIdentifier: String { get }
     
     /// Short identifier for the file type (3-8 characters, lowercase)
@@ -318,10 +342,17 @@ public extension FileTypeMetadata {
     }
     
     /// Full type identifier with version (if applicable)
-    /// Example: "com.apple.disk-image.prodos-order-v1.0"
+    /// Full type identifier including version (if available)
+    /// Example: "com.apple.disk-image.dsk.prodos.v2.4"
+    /// If version is not available, returns the base typeIdentifier
     var fullTypeIdentifier: String {
         if let version = version {
-            return "\(typeIdentifier)-v\(version.description)"
+            // Version is already included in typeIdentifier if using UTIGenerator
+            // For backward compatibility, append version if not already present
+            if typeIdentifier.contains(".v") {
+                return typeIdentifier
+            }
+            return "\(typeIdentifier).v\(version.description)"
         }
         return typeIdentifier
     }
@@ -349,8 +380,27 @@ public extension FileTypeMetadata {
 /// Provides a centralized registry for looking up file types by various
 /// identifiers (type identifier, short ID, extension, magic number).
 public actor FileTypeMetadataRegistry {
-    /// Shared singleton instance
-    public static let shared = FileTypeMetadataRegistry()
+    /// Shared singleton instance (lazy initialization to avoid static initialization order issues)
+    // Protected by lock, so marked as nonisolated(unsafe) for concurrency safety
+    /// Lock for thread-safe initialization
+    nonisolated private static let lock = NSLock()
+    
+    /// Shared singleton instance (lazy, thread-safe)
+    /// Uses Static struct pattern to avoid static initialization order issues
+    public static var shared: FileTypeMetadataRegistry {
+        lock.lock()
+        defer { lock.unlock() }
+        
+        struct Static {
+            nonisolated(unsafe) static var instance: FileTypeMetadataRegistry?
+        }
+        
+        if Static.instance == nil {
+            Static.instance = FileTypeMetadataRegistry()
+        }
+        
+        return Static.instance!
+    }
     
     /// Registered metadata (typeIdentifier -> metadata)
     private var byTypeIdentifier: [String: any FileTypeMetadata] = [:]

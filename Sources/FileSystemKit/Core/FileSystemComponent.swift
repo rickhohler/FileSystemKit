@@ -306,6 +306,35 @@ public struct FileSystemEntryMetadata: Codable {
     /// Detected file type category, if available
     public var fileType: FileTypeCategory?
     
+    /// Generated UTI for this file type (lazy-computed, cached here)
+    /// Uses FileTypeUTIRegistry to generate UTIs based on file type category and context
+    public var fileTypeUTI: String? {
+        guard let fileType = fileType else {
+            return nil
+        }
+        
+        // Extract file system context from attributes if available
+        let fileSystemFormat: FileSystemFormat? = {
+            if let formatString = attributes["fileSystemFormat"] as? String {
+                return FileSystemFormat(rawValue: formatString)
+            }
+            return nil
+        }()
+        
+        let fileSystemVersion = attributes["fileSystemVersion"] as? String
+        
+        // Extract file extension from name
+        let fileExtension = (name as NSString).pathExtension.lowercased()
+        let ext = fileExtension.isEmpty ? nil : fileExtension
+        
+        return FileTypeUTIRegistry.shared.generateUTI(
+            for: fileType,
+            fileSystemFormat: fileSystemFormat,
+            fileSystemVersion: fileSystemVersion,
+            fileExtension: ext
+        )
+    }
+    
     /// Special file type information (for block devices, character devices, sockets, FIFOs)
     /// Use `SpecialFileType` from Core/SpecialFileType.swift to detect and store special file types
     public var specialFileType: String?
