@@ -77,7 +77,10 @@ final class UTIGeneratorTests: XCTestCase {
         var metadata = DiskImageMetadata()
         metadata.detectedDiskImageFormat = .woz
         metadata.detectedFileSystemFormat = .appleDOS33
-        metadata.detectedFileSystemVersion = "3.3"
+        metadata.operatingSystemVersion = OperatingSystemVersion(
+            fileSystemFormat: .appleDOS33,
+            version: Version("3.3", source: "Test")
+        )
         
         let uti = UTIGenerator.generateUTI(from: metadata)
         XCTAssertEqual(uti, "com.apple.disk-image.woz.dos33.v3.3")
