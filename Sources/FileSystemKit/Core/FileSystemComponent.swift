@@ -121,7 +121,7 @@ public protocol FileSystemComponent: AnyObject {
 ///
 /// - ``FileSystemEntry`` - Uses FileLocation to store file data location
 /// - [Disk Sector (Wikipedia)](https://en.wikipedia.org/wiki/Disk_sector) - Information about disk sectors
-public struct FileLocation: Codable, Equatable {
+public struct FileLocation: Codable, Equatable, Sendable {
     /// Track number (if applicable)
     public let track: Int?
     
@@ -195,7 +195,7 @@ public struct FileLocation: Codable, Equatable {
 /// - [Cryptographic Hash Function (Wikipedia)](https://en.wikipedia.org/wiki/Cryptographic_hash_function) - Overview of hash functions
 /// - [SHA-2 (Wikipedia)](https://en.wikipedia.org/wiki/SHA-2) - SHA-256 algorithm details
 /// - [MD5 (Wikipedia)](https://en.wikipedia.org/wiki/MD5) - MD5 algorithm details
-public struct FileHash: Hashable, Codable {
+public struct FileHash: Hashable, Codable, Sendable {
     /// Hash algorithm used
     public let algorithm: HashAlgorithm
     
@@ -293,7 +293,7 @@ public struct FileHash: Hashable, Codable {
 /// - ``FileSystemEntry`` - Uses this metadata
 /// - ``FileLocation`` - Physical location information
 /// - ``FileHash`` - Content hash information
-public struct FileSystemEntryMetadata: Codable {
+public struct FileSystemEntryMetadata: Codable, @unchecked Sendable {
     /// File name
     public let name: String
     
@@ -305,6 +305,10 @@ public struct FileSystemEntryMetadata: Codable {
     
     /// Detected file type category, if available
     public var fileType: FileTypeCategory?
+    
+    /// File type ID from FileTypeRegistry (3-8 char shortID)
+    /// More efficient than storing full UTI
+    public var fileTypeID: String?
     
     /// Generated UTI for this file type (lazy-computed, cached here)
     /// Uses FileTypeUTIRegistry to generate UTIs based on file type category and context
@@ -353,6 +357,7 @@ public struct FileSystemEntryMetadata: Codable {
         size: Int,
         modificationDate: Date? = nil,
         fileType: FileTypeCategory? = nil,
+        fileTypeID: String? = nil,
         specialFileType: String? = nil,
         attributes: [String: Any] = [:],
         location: FileLocation? = nil,
@@ -362,6 +367,7 @@ public struct FileSystemEntryMetadata: Codable {
         self.size = size
         self.modificationDate = modificationDate
         self.fileType = fileType
+        self.fileTypeID = fileTypeID
         self.specialFileType = specialFileType
         self.attributes = attributes
         self.location = location
@@ -370,7 +376,7 @@ public struct FileSystemEntryMetadata: Codable {
     
     // Custom Codable implementation for attributes (Dictionary with Any values)
     enum CodingKeys: String, CodingKey {
-        case name, size, modificationDate, fileType, specialFileType, location, hashes
+        case name, size, modificationDate, fileType, fileTypeID, specialFileType, location, hashes
     }
     
     public init(from decoder: Decoder) throws {
@@ -379,6 +385,7 @@ public struct FileSystemEntryMetadata: Codable {
         size = try container.decode(Int.self, forKey: .size)
         modificationDate = try container.decodeIfPresent(Date.self, forKey: .modificationDate)
         fileType = try container.decodeIfPresent(FileTypeCategory.self, forKey: .fileType)
+        fileTypeID = try container.decodeIfPresent(String.self, forKey: .fileTypeID)
         specialFileType = try container.decodeIfPresent(String.self, forKey: .specialFileType)
         location = try container.decodeIfPresent(FileLocation.self, forKey: .location)
         hashes = try container.decode([HashAlgorithm: FileHash].self, forKey: .hashes)
@@ -391,6 +398,7 @@ public struct FileSystemEntryMetadata: Codable {
         try container.encode(size, forKey: .size)
         try container.encodeIfPresent(modificationDate, forKey: .modificationDate)
         try container.encodeIfPresent(fileType, forKey: .fileType)
+        try container.encodeIfPresent(fileTypeID, forKey: .fileTypeID)
         try container.encodeIfPresent(specialFileType, forKey: .specialFileType)
         try container.encodeIfPresent(location, forKey: .location)
         try container.encode(hashes, forKey: .hashes)
@@ -493,7 +501,7 @@ public struct FileSystemEntryMetadata: Codable {
 /// - ``ChunkStorage`` - Content storage protocol
 public class FileSystemEntry: FileSystemComponent {
     /// Entry metadata (always loaded, lightweight)
-    public let metadata: FileSystemEntryMetadata
+    public var metadata: FileSystemEntryMetadata
     
     /// Reference to the chunk containing file data (if applicable)
     /// This links the file system entry to its binary data in ChunkStorage

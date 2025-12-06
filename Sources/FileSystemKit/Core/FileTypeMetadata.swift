@@ -141,6 +141,22 @@ public protocol FileTypeMetadata: Sendable {
     /// Additional metadata dictionary
     /// Can include vendor, specification URL, etc.
     var additionalMetadata: [String: String] { get }
+    
+    /// SF Symbol icon name for this file type
+    /// 
+    /// Uses Apple's SF Symbols for consistent iconography across the system.
+    /// Common examples:
+    /// - Document types: "doc.text.fill", "doc.fill", "doc.plaintext.fill"
+    /// - Code types: "doc.text.fill", "curlybraces"
+    /// - Binary types: "cpu", "memorychip.fill"
+    /// - Disk images: "opticaldisc", "externaldrive.fill"
+    /// - Archives: "archivebox.fill", "zip"
+    /// - Media: "photo.fill", "music.note", "video.fill"
+    /// 
+    /// See [SF Symbols](https://developer.apple.com/sf-symbols/) for the full catalog.
+    /// 
+    /// nil if no icon is specified (will use category-based default)
+    var iconName: String? { get }
 }
 
 // MARK: - FileTypeVersion
@@ -339,6 +355,44 @@ public extension FileTypeMetadata {
     /// Default implementation: empty additional metadata
     var additionalMetadata: [String: String] {
         return [:]
+    }
+    
+    /// Default implementation: no icon specified
+    /// Returns nil, indicating that a category-based default should be used
+    var iconName: String? {
+        return nil
+    }
+    
+    /// Get icon name with fallback to category-based default
+    /// 
+    /// Returns the custom icon name if specified, otherwise returns
+    /// a category-appropriate default SF Symbol.
+    /// 
+    /// - Returns: SF Symbol name for this file type
+    var effectiveIconName: String {
+        if let iconName = iconName {
+            return iconName
+        }
+        
+        // Category-based defaults
+        switch category {
+        case .document:
+            return "doc.text.fill"
+        case .executable:
+            return "cpu"
+        case .data:
+            return "doc.fill"
+        case .system:
+            return "gearshape.fill"
+        case .media:
+            return "photo.fill"
+        case .archive:
+            return "archivebox.fill"
+        case .diskImage:
+            return "opticaldisc"
+        case .unknown:
+            return "doc.fill"
+        }
     }
     
     /// Full type identifier with version (if applicable)

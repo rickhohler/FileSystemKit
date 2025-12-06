@@ -91,6 +91,10 @@ public struct AppleIIProDOSDiskImageMetadata: FileTypeMetadata {
             "fileSystem": "ProDOS"
         ]
     }
+    
+    public var iconName: String? {
+        "opticaldisc"  // SF Symbol for disk image
+    }
 }
 
 // MARK: - Example: Generic Disk Image Metadata
@@ -164,6 +168,8 @@ public struct GenericDiskImageMetadata: FileTypeMetadata {
     public var references: [URL] {
         return [] // No specific references for generic format
     }
+    
+    // iconName uses default (nil) - will use category-based default "opticaldisc"
 }
 
 // MARK: - Example: Archive Format Metadata
@@ -236,6 +242,10 @@ public struct ArchiveFormatMetadata: FileTypeMetadata {
     
     public var references: [URL] {
         return [] // No specific references for generic format
+    }
+    
+    public var iconName: String? {
+        "archivebox.fill"  // SF Symbol for archive files
     }
 }
 
