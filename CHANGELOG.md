@@ -7,20 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.8.0] - 2025-12-06
+
 ### Added
-- Integration with DesignAlgorithmsKit for common design patterns
-- All registries now use `TypeRegistry` internally for type storage
-- Actor-based registries conform to `ActorSingleton` protocol
-- `FileSystemStrategy` conforms to `Strategy` protocol
+- **UTI-Based File Type System**: Complete rewrite using Uniform Type Identifiers
+  - `UTI` struct with conformance hierarchy and ancestor traversal (186 lines)
+  - `FileTypeDefinition` with comprehensive metadata and signature matching (229 lines)
+  - `FileTypeRegistry` actor-based registry with triple-index lookup (588 lines)
+  - Support for shortID (3-8 chars) for efficient storage and database foreign keys
+  - Priority-based type detection and disambiguation
+  - Conformance-based type lookup with hierarchy traversal
+  
+- **Handler Protocol System**: Five extensible handler protocols (528 lines)
+  - `FileViewer` for displaying files with priority-based selection and feature flags
+  - `FileParser` for parsing file content with generic Output type
+  - `FileEditor` for editing files with generic EditOperation type and undo support
+  - `FileConverter` for format conversion with options, quality metrics, and lossless flag
+  - `FileValidator` for file integrity validation with quick and deep validation
+  - Complete handler registration and lookup in FileTypeRegistry
+  
+- **File Type Detection Engine**: Multi-strategy detection system (242 lines)
+  - Magic number/signature matching (highest confidence)
+  - File extension matching (medium confidence)
+  - User hint support for guided detection
+  - Confidence scoring (0.0-1.0) and strategy reporting
+  - Priority-based disambiguation when multiple types match
+  - Convenience methods for URL-based and quick detection
+  
+- **FileSystemEntry Integration**: Seamless file type system integration (302 lines)
+  - Added `fileTypeID` property to `FileSystemEntryMetadata` for efficient storage
+  - Extension methods for handler lookups (viewer, parser, editor, converter, validator)
+  - `detectFileType(from:)` method for automatic detection
+  - `createView(from:)`, `validate(from:)` convenience methods
+  - Folder-level batch operations (`detectAllFileTypes`, `files(ofType:)`, `files(withCapability:)`)
+  
+- **Comprehensive Test Suite**: 17 core infrastructure tests (372 lines)
+  - UTI conformance and equality tests
+  - File type registration tests (with override and validation)
+  - Lookup tests (shortID, UTI, extension, conformance)
+  - Signature pattern matching tests (bytes and strings)
+  - FileSystemEntry integration tests
+  - All tests passing ✅
 
 ### Changed
-- `BootabilityDetectorRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
-- `FileTypeUTIRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` for provider storage
-- `FileExtensionRegistry` now conforms to `DesignAlgorithmsKit.ActorSingleton` protocol
-- `PipelineRegistry` now conforms to `DesignAlgorithmsKit.ActorSingleton` protocol
-- `DiskImageAdapterRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
-- `CompressionAdapterRegistry` now uses `DesignAlgorithmsKit.TypeRegistry` internally
-- `FileSystemStrategy` now conforms to `DesignAlgorithmsKit.Strategy` protocol
+- **Type Naming Refinement**: Professional, industry-standard naming conventions
+  - `MagicPattern` → `FileSignaturePattern` (industry standard terminology)
+  - `MagicOffset` → `SignatureOffset` (clearer intent)
+  - `MagicTest` → `SignatureTest` (consistent)
+  - `MagicValue` → `SignatureValue` (consistent)
+  - `NumericType` → `SignatureNumericType` (proper scoping)
+  - `HandlerFileMetadata` → `FileHandlerMetadata` (natural English word order)
+  - `ValidationError` → `FileValidationError` (namespaced to prevent collisions)
+  - `ValidationWarning` → `FileValidationWarning` (namespaced to prevent collisions)
+  - `EmptyOptions` → `NoConversionOptions` (more descriptive)
+
+- **Concurrency Safety**: Full Swift 6 strict concurrency compliance
+  - Added `Sendable` conformance to `FileLocation`
+  - Added `Sendable` conformance to `FileHash`
+  - Added `Sendable` conformance to `RegistryStatistics`
+  - Added `@unchecked Sendable` to `FileSystemEntryMetadata` (contains `[String: Any]`)
+  - Changed `FileSystemEntry.metadata` from `let` to `var` to support type assignment
+
+### Removed
+- **Vintage File Type Registrations**: Moved to RetroboxFS package for clean architectural separation
+  - Removed `FileTypeRegistrationExamples.swift` (vintage-specific registrations)
+  - Moved Applesoft BASIC, WOZ, C64 BASIC, DOS 3.3 registrations to RetroboxFS
+  - Removed vintage-specific tests from FileSystemKit
+  - FileSystemKit now pure infrastructure, RetroboxFS contains domain implementations
+
+### Architecture
+- **Clean Separation**: FileSystemKit provides extensible file type infrastructure
+  - Core: UTI system, registry, protocols, detection engine, integration
+  - Domain: Vintage computing implementations moved to RetroboxFS
+  - Clear boundaries between infrastructure and application-specific code
+
+### Documentation
+- Added comprehensive file type system documentation
+- Added handler protocol usage examples and best practices
+- Added migration guide for clients adopting new system
+- Added architectural diagrams showing infrastructure vs domain separation
 
 ### Dependencies
 - Updated `DesignAlgorithmsKit` to 1.0.3+
