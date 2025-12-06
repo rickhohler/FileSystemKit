@@ -104,7 +104,7 @@ public enum UTIGenerator {
         return generateUTI(
             diskImageFormat: metadata.detectedDiskImageFormat ?? .raw,
             fileSystemFormat: metadata.detectedFileSystemFormat,
-            fileSystemVersion: metadata.detectedFileSystemVersion
+            fileSystemVersion: metadata.operatingSystemVersion?.version?.versionString
         )
     }
     
