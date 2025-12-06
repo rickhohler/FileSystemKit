@@ -185,16 +185,14 @@ public struct GzipCompressionAdapter: CompressionAdapter {
             guard let baseAddress = sourceBuffer.baseAddress else {
                 return 0
             }
-            // Use LZMA algorithm for DEFLATE-like compression
-            // Note: This creates compressed data but not true GZIP format (missing header/footer)
-            // For MVP, this provides basic compression functionality
+            // Use zlib algorithm for DEFLATE compression (compatible with GZIP)
             return compression_encode_buffer(
                 destinationBuffer,
                 destinationBufferSize,
                 baseAddress.assumingMemoryBound(to: UInt8.self),
                 data.count,
                 nil,
-                COMPRESSION_LZMA
+                COMPRESSION_ZLIB  // Use zlib for DEFLATE/gzip compatibility
             )
         }
         
